@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
 
     lib_mod.addImport("enr", enr_mod);
 
-    b.modules.put(b.dupe("zig-enr"), enr_mod) catch @panic("OOM");
+    b.modules.put(b.dupe("zig-enr"), lib_mod) catch @panic("OOM");
     // Now, we will create a static library based on the module we created above.
     // This creates a `std.Build.Step.Compile`, which is the build step responsible
     // for actually invoking the compiler.
