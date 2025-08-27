@@ -172,6 +172,91 @@ const test_enrs = [_][]const u8{
     "enr:-LK4QKWrXTpV9T78hNG6s8AM6IO4XH9kFT91uZtFg1GcsJ6dKovDOr1jtAAFPnS2lvNltkOGA9k29BUN7lFh_sjuc9QBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpC1MD8qAAAAAP__________gmlkgnY0gmlwhANAdd-Jc2VjcDI1NmsxoQLQa6ai7y9PMN5hpLe5HmiJSlYzMuzP7ZhwRiwHvqNXdoN0Y3CCI4yDdWRwgiOM",
 };
 
+/// Helper to write ENR to temp file
+fn writeTempEnr(tmp_dir: *std.testing.TmpDir, file_name: []const u8, enr: *ENR) !void {
+    const tmp_file = try tmp_dir.dir.createFile(file_name, .{});
+    defer tmp_file.close();
+
+    var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
+    const out = try enr.encodeToTxt(&txt_buffer);
+    try tmp_file.writeAll(out);
+}
+
+/// Helper to read ENR from temp file
+fn readTempEnr(tmp_dir: *std.testing.TmpDir, file_name: []const u8, enr: *ENR) !void {
+    const read_file = try tmp_dir.dir.openFile(file_name, .{});
+    defer read_file.close();
+
+    const file_size = try read_file.getEndPos();
+    var enr_txt: [enrlib.max_enr_size]u8 = undefined;
+    _ = try read_file.readAll(enr_txt[0..file_size]);
+    try ENR.decodeTxtInto(enr, enr_txt[0..file_size]);
+}
+
+/// Helper to write multiple ENRs to temp file
+fn writeTempMultipleEnrs(tmp_dir: *std.testing.TmpDir, file_name: []const u8, enrs: []ENR, delimiter: []const u8) !void {
+    const tmp_file = try tmp_dir.dir.createFile(file_name, .{});
+    defer tmp_file.close();
+
+    for (enrs, 0..) |*enr, i| {
+        var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
+        const out = try enr.encodeToTxt(&txt_buffer);
+        try tmp_file.writeAll(out);
+
+        if (i < enrs.len - 1) {
+            try tmp_file.writeAll(delimiter);
+        }
+    }
+}
+
+/// Helper to read multiple ENRs from temp file
+fn readTempMultipleEnrs(allocator: std.mem.Allocator, tmp_dir: *std.testing.TmpDir, file_name: []const u8, delimiter: []const u8) !std.ArrayList(ENR) {
+    const read_file = try tmp_dir.dir.openFile(file_name, .{});
+    defer read_file.close();
+
+    const file_size = try read_file.getEndPos();
+    const file_content = try allocator.alloc(u8, file_size);
+    defer allocator.free(file_content);
+
+    _ = try read_file.readAll(file_content);
+
+    var enr_list = std.ArrayList(ENR).init(allocator);
+    var iterator = std.mem.splitSequence(u8, file_content, delimiter);
+
+    while (iterator.next()) |enr_txt| {
+        const trimmed = std.mem.trim(u8, enr_txt, " \t\r\n");
+        if (trimmed.len == 0) continue;
+
+        var enr: ENR = undefined;
+        try ENR.decodeTxtInto(&enr, trimmed);
+        try enr_list.append(enr);
+    }
+
+    return enr_list;
+}
+
+/// Helper to compare two ENRs by encoding
+fn expectEqualEnrs(original: *ENR, loaded: *ENR) !void {
+    var original_encoded: [1024]u8 = undefined;
+    var loaded_encoded: [1024]u8 = undefined;
+
+    try original.encodeInto(&original_encoded);
+    try loaded.encodeInto(&loaded_encoded);
+
+    const original_len = original.encodedLen();
+    const loaded_len = loaded.encodedLen();
+
+    try testing.expectEqual(original_len, loaded_len);
+    try testing.expectEqualSlices(u8, original_encoded[0..original_len], loaded_encoded[0..loaded_len]);
+}
+
+/// Helper to create test file with content
+fn createTestFileWithContent(tmp_dir: *std.testing.TmpDir, file_name: []const u8, content: []const u8) !void {
+    const file = try tmp_dir.dir.createFile(file_name, .{});
+    defer file.close();
+    try file.writeAll(content);
+}
+
 test "single ENR file operations" {
     var tmp_dir = testing.tmpDir(.{});
     defer tmp_dir.cleanup();
@@ -190,32 +275,12 @@ test "single ENR file operations" {
 
     const test_file = "test_single_enr.txt";
 
-    const tmp_file = try tmp_dir.dir.createFile(test_file, .{});
-    var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
-    const out = try enr.encodeToTxt(&txt_buffer);
-    try tmp_file.writeAll(out);
-    tmp_file.close();
+    try writeTempEnr(&tmp_dir, test_file, &enr);
 
     var loaded_enr: ENR = undefined;
-    const read_file = try tmp_dir.dir.openFile(test_file, .{});
-    defer read_file.close();
+    try readTempEnr(&tmp_dir, test_file, &loaded_enr);
 
-    const file_size = try read_file.getEndPos();
-    var enr_txt: [enrlib.max_enr_size]u8 = undefined;
-    _ = try read_file.readAll(enr_txt[0..file_size]);
-    try ENR.decodeTxtInto(&loaded_enr, enr_txt[0..file_size]);
-
-    var original_encoded: [1024]u8 = undefined;
-    var loaded_encoded: [1024]u8 = undefined;
-
-    try enr.encodeInto(&original_encoded);
-    try loaded_enr.encodeInto(&loaded_encoded);
-
-    const original_len = enr.encodedLen();
-    const loaded_len = loaded_enr.encodedLen();
-
-    try testing.expectEqual(original_len, loaded_len);
-    try testing.expectEqualSlices(u8, original_encoded[0..original_len], loaded_encoded[0..loaded_len]);
+    try expectEqualEnrs(&enr, &loaded_enr);
 }
 
 test "multiple ENRs with newline delimiter" {
@@ -234,55 +299,15 @@ test "multiple ENRs with newline delimiter" {
 
     const test_file = "test_multiple_enrs_newline.txt";
 
-    const tmp_file = try tmp_dir.dir.createFile(test_file, .{});
-    for (enr_list.items, 0..) |*enr, i| {
-        var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
-        const out = try enr.encodeToTxt(&txt_buffer);
-        try tmp_file.writeAll(out);
+    try writeTempMultipleEnrs(&tmp_dir, test_file, enr_list.items, "\n");
 
-        if (i < enr_list.items.len - 1) {
-            try tmp_file.writeAll("\n");
-        }
-    }
-    tmp_file.close();
-
-    var loaded_enr_list = std.ArrayList(ENR).init(allocator);
+    var loaded_enr_list = try readTempMultipleEnrs(allocator, &tmp_dir, test_file, "\n");
     defer loaded_enr_list.deinit();
-
-    const read_file = try tmp_dir.dir.openFile(test_file, .{});
-    defer read_file.close();
-
-    const file_size = try read_file.getEndPos();
-    const file_content = try allocator.alloc(u8, file_size);
-    defer allocator.free(file_content);
-
-    _ = try read_file.readAll(file_content);
-
-    var iterator = std.mem.splitSequence(u8, file_content, "\n");
-
-    while (iterator.next()) |enr_txt| {
-        const trimmed = std.mem.trim(u8, enr_txt, " \t\r\n");
-        if (trimmed.len == 0) continue;
-
-        var enr: ENR = undefined;
-        try ENR.decodeTxtInto(&enr, trimmed);
-        try loaded_enr_list.append(enr);
-    }
 
     try testing.expectEqual(enr_list.items.len, loaded_enr_list.items.len);
 
     for (enr_list.items, loaded_enr_list.items) |*original, *loaded| {
-        var original_encoded: [1024]u8 = undefined;
-        var loaded_encoded: [1024]u8 = undefined;
-
-        try original.encodeInto(&original_encoded);
-        try loaded.encodeInto(&loaded_encoded);
-
-        const original_len = original.encodedLen();
-        const loaded_len = loaded.encodedLen();
-
-        try testing.expectEqual(original_len, loaded_len);
-        try testing.expectEqualSlices(u8, original_encoded[0..original_len], loaded_encoded[0..loaded_len]);
+        try expectEqualEnrs(original, loaded);
     }
 }
 
@@ -301,9 +326,7 @@ test "error handling - invalid ENR format" {
 
     const test_file = "test_invalid_enr.txt";
 
-    const file = try tmp_dir.dir.createFile(test_file, .{});
-    try file.writeAll("invalid-enr-content");
-    file.close();
+    try createTestFileWithContent(&tmp_dir, test_file, "invalid-enr-content");
 
     var enr: ENR = undefined;
     const read_file = try tmp_dir.dir.openFile(test_file, .{});
@@ -327,20 +350,10 @@ test "directory creation" {
     try tmp_dir.dir.makePath("nested");
     const test_file = "nested/enr.txt";
 
-    const file = try tmp_dir.dir.createFile(test_file, .{});
-    var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
-    const out = try enr.encodeToTxt(&txt_buffer);
-    try file.writeAll(out);
-    file.close();
+    try writeTempEnr(&tmp_dir, test_file, &enr);
 
     var loaded_enr: ENR = undefined;
-    const read_file = try tmp_dir.dir.openFile(test_file, .{});
-    defer read_file.close();
-
-    const file_size = try read_file.getEndPos();
-    var enr_txt: [enrlib.max_enr_size]u8 = undefined;
-    _ = try read_file.readAll(enr_txt[0..file_size]);
-    try ENR.decodeTxtInto(&loaded_enr, enr_txt[0..file_size]);
+    try readTempEnr(&tmp_dir, test_file, &loaded_enr);
 }
 
 test "empty and whitespace handling in multiple ENRs" {
@@ -348,36 +361,13 @@ test "empty and whitespace handling in multiple ENRs" {
     defer tmp_dir.cleanup();
 
     const allocator = testing.allocator;
-
     const test_file = "test_empty_entries.txt";
 
-    const file = try tmp_dir.dir.createFile(test_file, .{});
     const content = test_enrs[0] ++ "\n\n  \t  \n" ++ test_enrs[1] ++ "\n   \n" ++ test_enrs[2];
-    try file.writeAll(content);
-    file.close();
+    try createTestFileWithContent(&tmp_dir, test_file, content);
 
-    var enr_list = std.ArrayList(ENR).init(allocator);
+    var enr_list = try readTempMultipleEnrs(allocator, &tmp_dir, test_file, "\n");
     defer enr_list.deinit();
-
-    const read_file = try tmp_dir.dir.openFile(test_file, .{});
-    defer read_file.close();
-
-    const file_size = try read_file.getEndPos();
-    const file_content = try allocator.alloc(u8, file_size);
-    defer allocator.free(file_content);
-
-    _ = try read_file.readAll(file_content);
-
-    var iterator = std.mem.splitSequence(u8, file_content, "\n");
-
-    while (iterator.next()) |enr_txt| {
-        const trimmed = std.mem.trim(u8, enr_txt, " \t\r\n");
-        if (trimmed.len == 0) continue;
-
-        var enr: ENR = undefined;
-        try ENR.decodeTxtInto(&enr, trimmed);
-        try enr_list.append(enr);
-    }
 
     try testing.expectEqual(@as(usize, 3), enr_list.items.len);
 }
@@ -398,40 +388,10 @@ test "custom delimiter" {
 
     const test_file = "test_custom_delimiter.txt";
 
-    const file = try tmp_dir.dir.createFile(test_file, .{});
-    for (enr_list.items, 0..) |*enr, i| {
-        var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
-        const out = try enr.encodeToTxt(&txt_buffer);
-        try file.writeAll(out);
+    try writeTempMultipleEnrs(&tmp_dir, test_file, enr_list.items, " | ");
 
-        if (i < enr_list.items.len - 1) {
-            try file.writeAll(" | ");
-        }
-    }
-    file.close();
-
-    var loaded_enr_list = std.ArrayList(ENR).init(allocator);
+    var loaded_enr_list = try readTempMultipleEnrs(allocator, &tmp_dir, test_file, " | ");
     defer loaded_enr_list.deinit();
-
-    const read_file = try tmp_dir.dir.openFile(test_file, .{});
-    defer read_file.close();
-
-    const file_size = try read_file.getEndPos();
-    const file_content = try allocator.alloc(u8, file_size);
-    defer allocator.free(file_content);
-
-    _ = try read_file.readAll(file_content);
-
-    var iterator = std.mem.splitSequence(u8, file_content, " | ");
-
-    while (iterator.next()) |enr_txt| {
-        const trimmed = std.mem.trim(u8, enr_txt, " \t\r\n");
-        if (trimmed.len == 0) continue;
-
-        var enr: ENR = undefined;
-        try ENR.decodeTxtInto(&enr, trimmed);
-        try loaded_enr_list.append(enr);
-    }
 
     try testing.expectEqual(enr_list.items.len, loaded_enr_list.items.len);
 }
