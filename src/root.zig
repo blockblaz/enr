@@ -6,79 +6,39 @@ pub const EncodedENR = enrlib.EncodedENR;
 pub const SignableENR = enrlib.SignableENR;
 
 /// ENR file I/O error set
-pub const EnrFileError = error{
+pub const ENRFileError = error{
     /// The ENR file is too large to process
-    EnrFileTooLarge,
+    ENRFileTooLarge,
 };
 
 /// Loads ENR from the given file path
-pub fn loadEnrFromDisk(enr: *ENR, file_path: []const u8) !void {
-    const enr_file = try std.fs.cwd().openFile(file_path, .{});
-    defer enr_file.close();
-
-    const file_size = try enr_file.getEndPos();
-    if (file_size > enrlib.max_enr_size) return EnrFileError.EnrFileTooLarge;
-
-    var enr_txt: [enrlib.max_enr_size]u8 = undefined;
-    _ = try enr_file.readAll(enr_txt[0..file_size]);
-
-    try ENR.decodeTxtInto(enr, enr_txt[0..file_size]);
+pub fn loadENRFromDisk(enr: *ENR, file_path: []const u8) !void {
+    var buffer: [enrlib.max_enr_size]u8 = undefined;
+    const content = try readFileContent(file_path, &buffer);
+    try ENR.decodeTxtInto(enr, content);
 }
 
 /// Loads EncodedENR from the given file path
-pub fn loadEncodedEnrFromDisk(encoded_enr: *EncodedENR, file_path: []const u8) !void {
-    const enr_file = try std.fs.cwd().openFile(file_path, .{});
-    defer enr_file.close();
-
-    const file_size = try enr_file.getEndPos();
-    if (file_size > enrlib.max_enr_size) return EnrFileError.EnrFileTooLarge;
-
-    var temp_txt: [enrlib.max_enr_size]u8 = undefined;
-    _ = try enr_file.readAll(temp_txt[0..file_size]);
-
-    encoded_enr.* = try EncodedENR.decodeTxtInto(temp_txt[0..file_size]);
+pub fn loadEncodedENRFromDisk(encoded_enr: *EncodedENR, file_path: []const u8) !void {
+    var buffer: [enrlib.max_enr_size]u8 = undefined;
+    const content = try readFileContent(file_path, &buffer);
+    encoded_enr.* = try EncodedENR.decodeTxtInto(content);
 }
 
 /// Saves an ENR to disk with given file path
-pub fn saveEnrToDisk(file_path: []const u8, enr: *ENR) !void {
-    if (std.fs.path.dirname(file_path)) |dir_path| {
-        try std.fs.cwd().makePath(dir_path);
-    }
-
-    const file = try std.fs.cwd().createFile(file_path, .{});
-    defer file.close();
-
-    var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
-    const out = try enr.encodeToTxt(&txt_buffer);
-
-    try file.writeAll(out);
+pub fn saveENRToDisk(file_path: []const u8, enr: *ENR) !void {
+    try writeENRToFile(file_path, enr);
 }
 
 /// Saves a SignableENR to disk with given file path
-pub fn saveSignableEnrToDisk(file_path: []const u8, signable_enr: *SignableENR) !void {
-    if (std.fs.path.dirname(file_path)) |dir_path| {
-        try std.fs.cwd().makePath(dir_path);
-    }
-
-    const file = try std.fs.cwd().createFile(file_path, .{});
-    defer file.close();
-
-    var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
-    const out = try signable_enr.encodeToTxt(&txt_buffer);
-
-    try file.writeAll(out);
+pub fn saveSignableENRToDisk(file_path: []const u8, signable_enr: *SignableENR) !void {
+    try writeENRToFile(file_path, signable_enr);
 }
 
 /// Loads multiple ENRs from a single file
-pub fn loadMultipleEnrsFromDisk(enr_list: *std.ArrayList(ENR), file_path: []const u8, delimiter: []const u8) !void {
-    const enr_file = try std.fs.cwd().openFile(file_path, .{});
-    defer enr_file.close();
-
-    const file_size = try enr_file.getEndPos();
-    const file_content = try enr_list.allocator.alloc(u8, file_size);
+pub fn loadMultipleENRsFromDisk(enr_list: *std.ArrayList(ENR), file_path: []const u8, delimiter: []const u8) !void {
+    const file_content = try readFileContentAlloc(enr_list.allocator, file_path);
     defer enr_list.allocator.free(file_content);
-
-    _ = try enr_file.readAll(file_content);
 
     var iterator = std.mem.splitSequence(u8, file_content, delimiter);
 
@@ -94,15 +54,9 @@ pub fn loadMultipleEnrsFromDisk(enr_list: *std.ArrayList(ENR), file_path: []cons
 }
 
 /// Loads multiple EncodedENRs from a single file
-pub fn loadMultipleEncodedEnrsFromDisk(enr_list: *std.ArrayList(EncodedENR), file_path: []const u8, delimiter: []const u8) !void {
-    const enr_file = try std.fs.cwd().openFile(file_path, .{});
-    defer enr_file.close();
-
-    const file_size = try enr_file.getEndPos();
-    const file_content = try enr_list.allocator.alloc(u8, file_size);
+pub fn loadMultipleEncodedENRsFromDisk(enr_list: *std.ArrayList(EncodedENR), file_path: []const u8, delimiter: []const u8) !void {
+    const file_content = try readFileContentAlloc(enr_list.allocator, file_path);
     defer enr_list.allocator.free(file_content);
-
-    _ = try enr_file.readAll(file_content);
 
     var iterator = std.mem.splitSequence(u8, file_content, delimiter);
 
@@ -117,7 +71,59 @@ pub fn loadMultipleEncodedEnrsFromDisk(enr_list: *std.ArrayList(EncodedENR), fil
 }
 
 /// Saves multiple ENRs to a single file
-pub fn saveMultipleEnrsToDisk(file_path: []const u8, enrs: []ENR, delimiter: []const u8) !void {
+pub fn saveMultipleENRsToDisk(file_path: []const u8, enrs: []ENR, delimiter: []const u8) !void {
+    try writeMultipleENRsToFile(file_path, enrs, delimiter);
+}
+
+/// Saves multiple SignableENRs to a single file
+pub fn saveMultipleSignableENRsToDisk(file_path: []const u8, signable_enrs: []SignableENR, delimiter: []const u8) !void {
+    try writeMultipleENRsToFile(file_path, signable_enrs, delimiter);
+}
+
+/// Helper function to read entire file content into a buffer
+fn readFileContent(file_path: []const u8, buffer: []u8) ![]const u8 {
+    const file = try std.fs.cwd().openFile(file_path, .{});
+    defer file.close();
+
+    const file_size = try file.getEndPos();
+    if (file_size > buffer.len) return ENRFileError.ENRFileTooLarge;
+
+    _ = try file.readAll(buffer[0..file_size]);
+    return buffer[0..file_size];
+}
+
+/// Helper function to read entire file content using allocator
+fn readFileContentAlloc(allocator: std.mem.Allocator, file_path: []const u8) ![]u8 {
+    const file = try std.fs.cwd().openFile(file_path, .{});
+    defer file.close();
+
+    const file_size = try file.getEndPos();
+    const content = try allocator.alloc(u8, file_size);
+    _ = try file.readAll(content);
+    return content;
+}
+
+/// Helper function to write content to file with directory creation
+fn writeFileContent(file_path: []const u8, content: []const u8) !void {
+    if (std.fs.path.dirname(file_path)) |dir_path| {
+        try std.fs.cwd().makePath(dir_path);
+    }
+
+    const file = try std.fs.cwd().createFile(file_path, .{});
+    defer file.close();
+
+    try file.writeAll(content);
+}
+
+/// Helper function to write ENR text format to file
+fn writeENRToFile(file_path: []const u8, enr: anytype) !void {
+    var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
+    const out = try enr.encodeToTxt(&txt_buffer);
+    try writeFileContent(file_path, out);
+}
+
+/// Helper function to write multiple ENRs to file with delimiter
+fn writeMultipleENRsToFile(file_path: []const u8, enrs: anytype, delimiter: []const u8) !void {
     if (std.fs.path.dirname(file_path)) |dir_path| {
         try std.fs.cwd().makePath(dir_path);
     }
@@ -131,26 +137,6 @@ pub fn saveMultipleEnrsToDisk(file_path: []const u8, enrs: []ENR, delimiter: []c
         try file.writeAll(out);
 
         if (i < enrs.len - 1) {
-            try file.writeAll(delimiter);
-        }
-    }
-}
-
-/// Saves multiple SignableENRs to a single file
-pub fn saveMultipleSignableEnrsToDisk(file_path: []const u8, signable_enrs: []SignableENR, delimiter: []const u8) !void {
-    if (std.fs.path.dirname(file_path)) |dir_path| {
-        try std.fs.cwd().makePath(dir_path);
-    }
-
-    const file = try std.fs.cwd().createFile(file_path, .{});
-    defer file.close();
-
-    for (signable_enrs, 0..) |*signable_enr, i| {
-        var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
-        const out = try signable_enr.encodeToTxt(&txt_buffer);
-        try file.writeAll(out);
-
-        if (i < signable_enrs.len - 1) {
             try file.writeAll(delimiter);
         }
     }
