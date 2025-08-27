@@ -131,8 +131,8 @@ fn writeMultipleENRsToFile(file_path: []const u8, enrs: anytype, delimiter: []co
     const file = try std.fs.cwd().createFile(file_path, .{});
     defer file.close();
 
+    var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
     for (enrs, 0..) |*enr, i| {
-        var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
         const out = try enr.encodeToTxt(&txt_buffer);
         try file.writeAll(out);
 
@@ -198,8 +198,8 @@ fn writeTempMultipleEnrs(tmp_dir: *std.testing.TmpDir, file_name: []const u8, en
     const tmp_file = try tmp_dir.dir.createFile(file_name, .{});
     defer tmp_file.close();
 
+    var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
     for (enrs, 0..) |*enr, i| {
-        var txt_buffer: [enrlib.max_enr_size * 2 + 4]u8 = undefined;
         const out = try enr.encodeToTxt(&txt_buffer);
         try tmp_file.writeAll(out);
 
