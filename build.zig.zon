@@ -9,8 +9,8 @@
 
     .dependencies = .{
         .discv5 = .{
-            .url = "git+https://github.com/blockblaz/zig-discv5#bc96ea8e6a8c3ddc5880256a11e19df3afe37870",
-            .hash = "discv5-0.1.0-fkJduBNjAQCUYP7JVBtZ6A5Y79UYpyC8JHz5kzGnB-K5",
+            .url = "git+https://github.com/blockblaz/zig-discv5#31f46b3b5e5b25a68638bb320545b74c642c6caa",
+            .hash = "discv5-0.1.0-fkJduLBkAQBQHUJxdOEqCR2YMKfF1lNhaLM_FgonkFRW",
         },
     },
     .paths = .{
