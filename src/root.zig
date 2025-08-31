@@ -1,5 +1,6 @@
 const std = @import("std");
-const enrlib = @import("enr");
+const enrlib = @import("enr.zig");
+const secp256k1 = @import("secp256k1.zig");
 
 /// ENR (Ethereum Node Record) - A fully parsed and validated ENR for network operations.
 ///
@@ -22,6 +23,13 @@ pub const EncodedENR = enrlib.EncodedENR;
 /// format and ensures proper structure before signature generation.
 pub const SignableENR = enrlib.SignableENR;
 pub const KeyPair = enrlib.KeyPair;
+
+/// Deinitializes the global context for secp256k1 operations.
+/// It should be called in your main function before the program exits.
+pub const deinitGlobalSecp256k1Ctx = secp256k1.deinitSecp256k1Context;
+
+/// Returns a pointer to the global context for secp256k1 operations.
+pub const getGlobalSecp256k1Ctx = secp256k1.getSecp256k1Context;
 
 const enr_prefix = "enr:";
 /// ENR file I/O error set
