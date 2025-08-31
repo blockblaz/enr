@@ -1,0 +1,32 @@
+name: Enr CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  ZIG_VERSION: 0.14.1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4  
+
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2.0.5
+        with:
+          version: 0.14.1
+
+      - name: Formatting
+        run: zig fmt --check --color on .
+
+      - name: Unit testing
+        run: zig build test --summary all
+
+      - name: Building
+        run: zig build -Doptimize=ReleaseSafe

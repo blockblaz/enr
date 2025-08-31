@@ -1,0 +1,23 @@
+.{
+    .name = .zig_enr,
+
+    .version = "0.0.0",
+
+    .fingerprint = 0x499ae5d25c594f6a,
+
+    .minimum_zig_version = "0.14.1",
+
+    .dependencies = .{
+        .secp256k1 = .{
+            .url = "git+https://github.com/zig-bitcoin/libsecp256k1-zig#b96922b375a601f3303bf43be1dceb3d101df6c6",
+            .hash = "secp256k1-0.0.0-AAAAAPPgAAADPOkS7brnO1B26LjbhZsxwz6Kx8a6jCwB",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+        "README.md",
+    },
+}
