@@ -141,6 +141,16 @@ pub const IDScheme = enum {
 pub const KeyPair = union(IDScheme) {
     v4: secp256k1.SecretKey,
 
+    pub fn fromSecretKeyString(secret: []const u8) !KeyPair {
+        const key = try secp256k1.SecretKey.fromString(secret);
+        return KeyPair{ .v4 = key };
+    }
+
+    pub fn fromSecretKeySlice(slice: []const u8) !KeyPair {
+        const key = try secp256k1.SecretKey.fromSlice(slice);
+        return KeyPair{ .v4 = key };
+    }
+
     pub fn generate() KeyPair {
         return KeyPair{ .v4 = secp256k1.SecretKey.generate() };
     }
@@ -432,6 +442,14 @@ pub const SignableENR = struct {
             },
         }
         return SignableENR{ .kp = key_pair, .kvs = kvs, .seq = 0 };
+    }
+
+    pub fn fromSecretKeyString(key: []const u8) !SignableENR {
+        return SignableENR.create(try KeyPair.fromSecretKeyString(key));
+    }
+
+    pub fn fromSecretKeySlice(key: []const u8) !SignableENR {
+        return SignableENR.create(try KeyPair.fromSecretKeySlice(key));
     }
 
     pub fn get(self: *Self, key: []const u8) ?[]const u8 {
@@ -938,6 +956,27 @@ test "ENR test vector" {
 
     try std.testing.expectEqualStrings(enr_txt, signable_encoded_txt);
     try std.testing.expectEqual(enr_txt.len, signable_txt_len);
+
+    const kp1 = try KeyPair.fromSecretKeyString("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291");
+    var signable_enr1 = SignableENR.create(kp1);
+    defer signable_enr1.deinit();
+    signable_enr1.seq = seq;
+    try signable_enr1.set("ip", ip);
+    try signable_enr1.set("udp", udp);
+
+    try std.testing.expectEqualSlices(u8, signable_enr.get("id").?, decoded_enr.get("id").?);
+    try std.testing.expectEqualSlices(u8, signable_enr.get("ip").?, decoded_enr.get("ip").?);
+    try std.testing.expectEqualSlices(u8, signable_enr.get("udp").?, decoded_enr.get("udp").?);
+
+    var signable_enr2 = try SignableENR.fromSecretKeyString("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291");
+    defer signable_enr2.deinit();
+    signable_enr2.seq = seq;
+    try signable_enr2.set("ip", ip);
+    try signable_enr2.set("udp", udp);
+
+    try std.testing.expectEqualSlices(u8, signable_enr2.get("id").?, decoded_enr.get("id").?);
+    try std.testing.expectEqualSlices(u8, signable_enr2.get("ip").?, decoded_enr.get("ip").?);
+    try std.testing.expectEqualSlices(u8, signable_enr2.get("udp").?, decoded_enr.get("udp").?);
 
     const encoded_enr = try EncodedENR.decodeTxtInto(enr_txt);
     try std.testing.expectEqualStrings(&decoded_enr.signature, &encoded_enr.signature());
