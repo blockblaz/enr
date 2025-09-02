@@ -3,7 +3,7 @@
 
     .version = "0.0.0",
 
-    .fingerprint = 0x499ae5d218a506b4,
+    .fingerprint = 0x499ae5d2efd868cb,
 
     .minimum_zig_version = "0.14.1",
 
@@ -13,8 +13,8 @@
             .hash = "secp256k1-0.0.0-AAAAAPPgAAADPOkS7brnO1B26LjbhZsxwz6Kx8a6jCwB",
         },
         .peer_id = .{
-            .url = "git+https://github.com/blockblaz/peer-id#b8f98a401e1659cc06243355fc00811a4cbdf2b5",
-            .hash = "peer_id-0.0.0-jlAlYI9cAACWW0w-GZaf3xAuwXNZhOOGKQtm3CvqcdiK",
+            .url = "git+https://github.com/blockblaz/peer-id#7a3f3ca552c5a3b8a360d5ff0c0fefefa837b607",
+            .hash = "peer_id-0.0.0-w06RypFcAAATLl9dnxeWudexMYqnCY-IeYoe9slSUbs6",
         },
     },
     .paths = .{
