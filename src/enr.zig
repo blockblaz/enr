@@ -128,7 +128,7 @@ pub const IDScheme = enum {
         }
     }
 
-    pub fn publicKeyFromKVs(id: IDScheme, kvs: *KVs) Error!PublicKey {
+    pub fn publicKeyFromKVs(id: IDScheme, kvs: *const KVs) Error!PublicKey {
         switch (id) {
             .v4 => {
                 return try id.publicKey(kvs.get(id.publicKeyKey()) orelse return Error.BadPubkey);
@@ -250,33 +250,33 @@ pub const ENR = struct {
         self.kvs.deinit();
     }
 
-    pub fn get(self: *ENR, key: []const u8) ?[]const u8 {
+    pub fn get(self: *const ENR, key: []const u8) ?[]const u8 {
         return self.kvs.get(key);
     }
 
-    pub fn id(self: *ENR) IDScheme {
+    pub fn id(self: *const ENR) IDScheme {
         return IDScheme.init(self.kvs.get("id").?) catch unreachable;
     }
 
-    pub fn publicKey(self: *ENR) PublicKey {
+    pub fn publicKey(self: *const ENR) PublicKey {
         return self.id().publicKeyFromKVs(&self.kvs) catch unreachable;
     }
 
-    pub fn nodeId(self: *ENR) NodeId {
+    pub fn nodeId(self: *const ENR) NodeId {
         return self.publicKey().nodeId();
     }
 
-    pub fn encodeInto(self: *ENR, out: []u8) !void {
+    pub fn encodeInto(self: *const ENR, out: []u8) !void {
         try encodeIntoFromComponents(out, &self.kvs, self.seq, self.signature);
     }
 
-    pub fn encodedLen(self: *ENR) usize {
+    pub fn encodedLen(self: *const ENR) usize {
         return totalLen(&self.kvs, self.seq);
     }
 
     /// Encode ENR to base64 text format (with "enr:" prefix)
     /// The `out` buffer must be at least `encodedTxtLen()` bytes long
-    pub fn encodeToTxt(self: *ENR, out: []u8) ![]u8 {
+    pub fn encodeToTxt(self: *const ENR, out: []u8) ![]u8 {
         const binary_len = self.encodedLen();
         const encoder = std.base64.url_safe_no_pad.Encoder;
         const encoded_len = encoder.calcSize(binary_len);
@@ -296,7 +296,7 @@ pub const ENR = struct {
     }
 
     /// Calculate the length needed for the encoded text format (including "enr:" prefix)
-    pub fn encodedTxtLen(self: *ENR) usize {
+    pub fn encodedTxtLen(self: *const ENR) usize {
         const binary_len = self.encodedLen();
         const encoder = std.base64.url_safe_no_pad.Encoder;
         const base64_len = encoder.calcSize(binary_len);
@@ -370,7 +370,7 @@ pub const ENR = struct {
         try decodeInto(enr, buffer[0..size]);
     }
 
-    pub fn getIp(self: *ENR) !?std.net.Ip4Address {
+    pub fn getIp(self: *const ENR) !?std.net.Ip4Address {
         if (self.get("ip")) |ip_bytes| {
             if (ip_bytes.len != 4) return error.InvalidLength;
             return std.net.Ip4Address.init(ip_bytes[0..4].*, 0);
@@ -378,7 +378,7 @@ pub const ENR = struct {
         return null;
     }
 
-    pub fn getIpStr(self: *ENR, out: []u8) !?[]const u8 {
+    pub fn getIpStr(self: *const ENR, out: []u8) !?[]const u8 {
         if (self.get("ip")) |ip_bytes| {
             if (ip_bytes.len != 4) return error.InvalidLength;
             const formatted = try std.fmt.bufPrint(out, "{}.{}.{}.{}", .{ ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3] });
@@ -387,7 +387,7 @@ pub const ENR = struct {
         return null;
     }
 
-    pub fn getUdp(self: *ENR) !?u16 {
+    pub fn getUdp(self: *const ENR) !?u16 {
         if (self.get("udp")) |udp_bytes| {
             if (udp_bytes.len != 2) return error.InvalidLength;
             return std.mem.readInt(u16, udp_bytes[0..2], .big);
@@ -395,7 +395,7 @@ pub const ENR = struct {
         return null;
     }
 
-    pub fn getPublicKeyStr(self: *ENR, out: []u8, case: std.fmt.Case) ![]const u8 {
+    pub fn getPublicKeyStr(self: *const ENR, out: []u8, case: std.fmt.Case) ![]const u8 {
         const pk = self.publicKey();
         const serialized = switch (pk) {
             .v4 => |p| p.serialize(),
@@ -408,7 +408,7 @@ pub const ENR = struct {
         return out[0 .. public_key_hex.len + 2];
     }
 
-    pub fn getSignatureStr(self: *ENR, out: []u8, case: std.fmt.Case) ![]const u8 {
+    pub fn getSignatureStr(self: *const ENR, out: []u8, case: std.fmt.Case) ![]const u8 {
         const signature_hex = std.fmt.bytesToHex(self.signature, case);
         if (out.len < signature_hex.len + 2) return error.BufferTooSmall;
         @memcpy(out[0..2], "0x");
@@ -452,7 +452,7 @@ pub const SignableENR = struct {
         return SignableENR.create(try KeyPair.fromSecretKeySlice(key));
     }
 
-    pub fn get(self: *Self, key: []const u8) ?[]const u8 {
+    pub fn get(self: *const Self, key: []const u8) ?[]const u8 {
         return self.kvs.get(key);
     }
 
@@ -460,36 +460,36 @@ pub const SignableENR = struct {
         try self.kvs.put(key, value);
     }
 
-    pub fn id(self: *Self) IDScheme {
+    pub fn id(self: *const Self) IDScheme {
         return IDScheme.init(self.kvs.get("id").?) catch unreachable;
     }
 
-    pub fn publicKey(self: *Self) PublicKey {
+    pub fn publicKey(self: *const Self) PublicKey {
         return self.id().publicKeyFromKVs(&self.kvs) catch unreachable;
     }
 
-    pub fn nodeId(self: *Self) NodeId {
+    pub fn nodeId(self: *const Self) NodeId {
         return self.publicKey().nodeId();
     }
 
-    pub fn sign(self: *Self) ![signature_size]u8 {
+    pub fn sign(self: *const Self) ![signature_size]u8 {
         var buffer = [_]u8{0} ** max_enr_size;
         try encodeSignedPayload(&buffer, &self.kvs, self.seq);
         const signed = buffer[0..signedLen(&self.kvs, self.seq)];
         return try self.kp.sign(signed);
     }
 
-    pub fn encodeInto(self: *Self, out: []u8) !void {
+    pub fn encodeInto(self: *const Self, out: []u8) !void {
         const signature = try self.sign();
         try encodeIntoFromComponents(out, &self.kvs, self.seq, signature);
     }
 
-    pub fn encodedLen(self: *Self) usize {
+    pub fn encodedLen(self: *const Self) usize {
         return totalLen(&self.kvs, self.seq);
     }
 
     /// Calculate the length needed for the encoded text format (including "enr:" prefix)
-    pub fn encodedTxtLen(self: *Self) usize {
+    pub fn encodedTxtLen(self: *const Self) usize {
         const binary_len = self.encodedLen();
         const encoder = std.base64.url_safe_no_pad.Encoder;
         const base64_len = encoder.calcSize(binary_len);
@@ -498,7 +498,7 @@ pub const SignableENR = struct {
 
     /// Encode SignableENR to base64 text format (with "enr:" prefix)
     /// The `out` buffer must be at least `encodedTxtLen()` bytes long
-    pub fn encodeToTxt(self: *Self, out: []u8) ![]u8 {
+    pub fn encodeToTxt(self: *const Self, out: []u8) ![]u8 {
         const binary_len = self.encodedLen();
         const encoder = std.base64.url_safe_no_pad.Encoder;
         const encoded_len = encoder.calcSize(binary_len);
@@ -517,7 +517,7 @@ pub const SignableENR = struct {
         return out[0..required_len];
     }
 
-    pub fn getIp(self: *Self) !?std.net.Ip4Address {
+    pub fn getIp(self: *const Self) !?std.net.Ip4Address {
         if (self.get("ip")) |ip_bytes| {
             if (ip_bytes.len != 4) return error.InvalidLength;
             return std.net.Ip4Address.init(ip_bytes[0..4].*, 0);
@@ -525,7 +525,7 @@ pub const SignableENR = struct {
         return null;
     }
 
-    pub fn getIpStr(self: *Self, out: []u8) !?[]const u8 {
+    pub fn getIpStr(self: *const Self, out: []u8) !?[]const u8 {
         if (self.get("ip")) |ip_bytes| {
             if (ip_bytes.len != 4) return error.InvalidLength;
             const formatted = try std.fmt.bufPrint(out, "{}.{}.{}.{}", .{ ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3] });
@@ -534,7 +534,7 @@ pub const SignableENR = struct {
         return null;
     }
 
-    pub fn getUdp(self: *Self) !?u16 {
+    pub fn getUdp(self: *const Self) !?u16 {
         if (self.get("udp")) |udp_bytes| {
             if (udp_bytes.len != 2) return error.InvalidLength;
             return std.mem.readInt(u16, udp_bytes[0..2], .big);
@@ -542,7 +542,7 @@ pub const SignableENR = struct {
         return null;
     }
 
-    pub fn getPublicKeyStr(self: *Self, out: []u8, case: std.fmt.Case) ![]const u8 {
+    pub fn getPublicKeyStr(self: *const Self, out: []u8, case: std.fmt.Case) ![]const u8 {
         const pk = self.publicKey();
         const serialized = switch (pk) {
             .v4 => |p| p.serialize(),
@@ -555,7 +555,7 @@ pub const SignableENR = struct {
         return out[0 .. public_key_hex.len + 2];
     }
 
-    pub fn signStr(self: *Self, out: []u8, case: std.fmt.Case) ![]const u8 {
+    pub fn signStr(self: *const Self, out: []u8, case: std.fmt.Case) ![]const u8 {
         const signature_hex = std.fmt.bytesToHex(try self.sign(), case);
         if (out.len < signature_hex.len + 2) return error.BufferTooSmall;
         @memcpy(out[0..2], "0x");
@@ -564,7 +564,7 @@ pub const SignableENR = struct {
     }
 };
 
-fn encodeIntoFromComponents(out: []u8, kvs: *KVs, seq: u64, signature: [signature_size]u8) !void {
+fn encodeIntoFromComponents(out: []u8, kvs: *const KVs, seq: u64, signature: [signature_size]u8) !void {
     var writer = RLPWriter.init(out);
     try writer.writeListLength(listLen(kvs, seq));
     try writer.writeString(&signature);
@@ -579,7 +579,7 @@ fn encodeIntoFromComponents(out: []u8, kvs: *KVs, seq: u64, signature: [signatur
     }
 }
 
-fn encodeSignedPayload(out: []u8, kvs: *KVs, seq: u64) !void {
+fn encodeSignedPayload(out: []u8, kvs: *const KVs, seq: u64) !void {
     var writer = RLPWriter.init(out);
     try writer.writeListLength(signedListLen(kvs, seq));
     try writer.writeInt(u64, seq);
@@ -594,24 +594,24 @@ fn encodeSignedPayload(out: []u8, kvs: *KVs, seq: u64) !void {
 }
 
 /// The length of the whole rlp list
-fn totalLen(kvs: *KVs, seq: u64) usize {
+fn totalLen(kvs: *const KVs, seq: u64) usize {
     const list_len = listLen(kvs, seq);
     return rlp.elemLen(list_len);
 }
 
 /// The length of all rlp list elements
-fn listLen(kvs: *KVs, seq: u64) usize {
+fn listLen(kvs: *const KVs, seq: u64) usize {
     return signedListLen(kvs, seq) + rlp.elemLen(signature_size); // signature
 }
 
 /// The length of the rlp list that is signed over
-fn signedLen(kvs: *KVs, seq: u64) usize {
+fn signedLen(kvs: *const KVs, seq: u64) usize {
     const list_len = signedListLen(kvs, seq);
     return rlp.elemLen(list_len);
 }
 
 /// The length of the rlp list elements that are signed over
-fn signedListLen(kvs: *KVs, seq: u64) usize {
+fn signedListLen(kvs: *const KVs, seq: u64) usize {
     var length: usize = 0;
     length += rlp.intLen(u64, seq); // seq
     length += kvsLen(kvs);
@@ -619,7 +619,7 @@ fn signedListLen(kvs: *KVs, seq: u64) usize {
     return length;
 }
 
-fn kvsLen(kvs: *KVs) usize {
+fn kvsLen(kvs: *const KVs) usize {
     var length: usize = 0;
     var it = kvs.iterator();
     defer it.deinit();

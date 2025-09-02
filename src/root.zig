@@ -32,46 +32,145 @@ pub const deinitGlobalSecp256k1Ctx = secp256k1.deinitSecp256k1Context;
 pub const getGlobalSecp256k1Ctx = secp256k1.getSecp256k1Context;
 
 const enr_prefix = "enr:";
-/// ENR file I/O error set
-pub const ENRFileError = error{
-    /// The ENR file is too large to process
-    ENRFileTooLarge,
-};
 
 /// Loads ENR from the given file path
 pub fn loadENRFromDisk(enr: *ENR, file_path: []const u8) !void {
-    var buffer: [enrlib.max_enr_size]u8 = undefined;
-    const content = try readFileContent(file_path, &buffer);
-    try ENR.decodeTxtInto(enr, content);
+    const file = try std.fs.cwd().openFile(file_path, .{});
+    defer file.close();
+    try readENR(file.reader(), enr);
 }
 
 /// Loads EncodedENR from the given file path
 pub fn loadEncodedENRFromDisk(encoded_enr: *EncodedENR, file_path: []const u8) !void {
-    var buffer: [enrlib.max_enr_size]u8 = undefined;
-    const content = try readFileContent(file_path, &buffer);
-    encoded_enr.* = try EncodedENR.decodeTxtInto(content);
+    const file = try std.fs.cwd().openFile(file_path, .{});
+    defer file.close();
+    try readEncodedENR(file.reader(), encoded_enr);
 }
 
 /// Saves an ENR to disk with given file path
-pub fn saveENRToDisk(file_path: []const u8, enr: *ENR) !void {
-    var txt_buffer: [enrlib.max_enr_size * 2 + enr_prefix.len]u8 = undefined;
-    const out = try enr.encodeToTxt(&txt_buffer);
-    try writeFileContent(file_path, out);
+pub fn saveENRToDisk(file_path: []const u8, enr: *const ENR) !void {
+    if (std.fs.path.dirname(file_path)) |dir_path| {
+        try std.fs.cwd().makePath(dir_path);
+    }
+
+    const file = try std.fs.cwd().createFile(file_path, .{});
+    defer file.close();
+
+    try writeENR(file.writer(), enr);
 }
 
 /// Saves a SignableENR to disk with given file path
-pub fn saveSignableENRToDisk(file_path: []const u8, signable_enr: *SignableENR) !void {
-    var txt_buffer: [enrlib.max_enr_size * 2 + enr_prefix.len]u8 = undefined;
-    const out = try signable_enr.encodeToTxt(&txt_buffer);
-    try writeFileContent(file_path, out);
+pub fn saveSignableENRToDisk(file_path: []const u8, signable_enr: *const SignableENR) !void {
+    if (std.fs.path.dirname(file_path)) |dir_path| {
+        try std.fs.cwd().makePath(dir_path);
+    }
+
+    const file = try std.fs.cwd().createFile(file_path, .{});
+    defer file.close();
+
+    try writeSignableENR(file.writer(), signable_enr);
 }
 
 /// Loads multiple ENRs from a single file
 pub fn loadMultipleENRsFromDisk(enr_list: *std.ArrayList(ENR), file_path: []const u8, delimiter: []const u8) !void {
-    const file_content = try readFileContentAlloc(enr_list.allocator, file_path);
-    defer enr_list.allocator.free(file_content);
+    const file = try std.fs.cwd().openFile(file_path, .{});
+    defer file.close();
+    try readMultipleENRs(file.reader(), enr_list, delimiter);
+}
 
-    var iterator = std.mem.splitSequence(u8, file_content, delimiter);
+/// Loads multiple EncodedENRs from a single file
+pub fn loadMultipleEncodedENRsFromDisk(enr_list: *std.ArrayList(EncodedENR), file_path: []const u8, delimiter: []const u8) !void {
+    const file = try std.fs.cwd().openFile(file_path, .{});
+    defer file.close();
+    try readMultipleEncodedENRs(file.reader(), enr_list, delimiter);
+}
+
+/// Saves multiple ENRs to a single file
+pub fn saveMultipleENRsToDisk(file_path: []const u8, enrs: []const ENR, delimiter: []const u8) !void {
+    if (std.fs.path.dirname(file_path)) |dir_path| {
+        try std.fs.cwd().makePath(dir_path);
+    }
+
+    const file = try std.fs.cwd().createFile(file_path, .{});
+    defer file.close();
+
+    try writeMultipleENRs(file.writer(), enrs, delimiter);
+}
+
+/// Saves multiple SignableENRs to a single file
+pub fn saveMultipleSignableENRsToDisk(file_path: []const u8, signable_enrs: []const SignableENR, delimiter: []const u8) !void {
+    if (std.fs.path.dirname(file_path)) |dir_path| {
+        try std.fs.cwd().makePath(dir_path);
+    }
+
+    const file = try std.fs.cwd().createFile(file_path, .{});
+    defer file.close();
+
+    try writeMultipleSignableENRs(file.writer(), signable_enrs, delimiter);
+}
+
+/// Generic function to write ENR to any writer
+pub fn writeENR(writer: anytype, enr: *const ENR) !void {
+    var txt_buffer: [enrlib.max_enr_size * 2 + enr_prefix.len]u8 = undefined;
+    const out = try enr.encodeToTxt(&txt_buffer);
+    try writer.writeAll(out);
+}
+
+/// Generic function to write SignableENR to any writer
+pub fn writeSignableENR(writer: anytype, signable_enr: *const SignableENR) !void {
+    var txt_buffer: [enrlib.max_enr_size * 2 + enr_prefix.len]u8 = undefined;
+    const out = try signable_enr.encodeToTxt(&txt_buffer);
+    try writer.writeAll(out);
+}
+
+/// Generic function to write multiple ENRs to any writer
+pub fn writeMultipleENRs(writer: anytype, enrs: []const ENR, delimiter: []const u8) !void {
+    var txt_buffer: [enrlib.max_enr_size * 2 + enr_prefix.len]u8 = undefined;
+    for (enrs, 0..) |*enr, i| {
+        const out = try enr.encodeToTxt(&txt_buffer);
+        try writer.writeAll(out);
+
+        if (i < enrs.len - 1) {
+            try writer.writeAll(delimiter);
+        }
+    }
+}
+
+/// Generic function to write multiple SignableENRs to any writer
+pub fn writeMultipleSignableENRs(writer: anytype, signable_enrs: []const SignableENR, delimiter: []const u8) !void {
+    var txt_buffer: [enrlib.max_enr_size * 2 + enr_prefix.len]u8 = undefined;
+    for (signable_enrs, 0..) |*enr, i| {
+        const out = try enr.encodeToTxt(&txt_buffer);
+        try writer.writeAll(out);
+
+        if (i < signable_enrs.len - 1) {
+            try writer.writeAll(delimiter);
+        }
+    }
+}
+
+/// Generic function to read ENR from any reader
+pub fn readENR(reader: anytype, enr: *ENR) !void {
+    var buffer: [enrlib.max_enr_size]u8 = undefined;
+    const bytes_read = try reader.readAll(&buffer);
+    const content = std.mem.trim(u8, buffer[0..bytes_read], " \t\r\n");
+    try ENR.decodeTxtInto(enr, content);
+}
+
+/// Generic function to read EncodedENR from any reader
+pub fn readEncodedENR(reader: anytype, encoded_enr: *EncodedENR) !void {
+    var buffer: [enrlib.max_enr_size]u8 = undefined;
+    const bytes_read = try reader.readAll(&buffer);
+    const content = std.mem.trim(u8, buffer[0..bytes_read], " \t\r\n");
+    encoded_enr.* = try EncodedENR.decodeTxtInto(content);
+}
+
+/// Generic function to read multiple ENRs from any reader
+pub fn readMultipleENRs(reader: anytype, enr_list: *std.ArrayList(ENR), delimiter: []const u8) !void {
+    const content = try reader.readAllAlloc(enr_list.allocator, std.math.maxInt(usize));
+    defer enr_list.allocator.free(content);
+
+    var iterator = std.mem.splitSequence(u8, content, delimiter);
 
     while (iterator.next()) |enr_txt| {
         const trimmed = std.mem.trim(u8, enr_txt, " \t\r\n");
@@ -79,101 +178,24 @@ pub fn loadMultipleENRsFromDisk(enr_list: *std.ArrayList(ENR), file_path: []cons
 
         var enr: ENR = undefined;
         try ENR.decodeTxtInto(&enr, trimmed);
-
         try enr_list.append(enr);
     }
 }
 
-/// Loads multiple EncodedENRs from a single file
-pub fn loadMultipleEncodedENRsFromDisk(enr_list: *std.ArrayList(EncodedENR), file_path: []const u8, delimiter: []const u8) !void {
-    const file_content = try readFileContentAlloc(enr_list.allocator, file_path);
-    defer enr_list.allocator.free(file_content);
+/// Generic function to read multiple EncodedENRs from any reader
+pub fn readMultipleEncodedENRs(reader: anytype, enr_list: *std.ArrayList(EncodedENR), delimiter: []const u8) !void {
+    const content = try reader.readAllAlloc(enr_list.allocator, std.math.maxInt(usize));
+    defer enr_list.allocator.free(content);
 
-    var iterator = std.mem.splitSequence(u8, file_content, delimiter);
+    var iterator = std.mem.splitSequence(u8, content, delimiter);
 
     while (iterator.next()) |enr_txt| {
         const trimmed = std.mem.trim(u8, enr_txt, " \t\r\n");
         if (trimmed.len == 0) continue; // Skip empty entries
 
         const encoded_enr = try EncodedENR.decodeTxtInto(trimmed);
-
         try enr_list.append(encoded_enr);
     }
-}
-
-/// Saves multiple ENRs to a single file
-pub fn saveMultipleENRsToDisk(file_path: []const u8, enrs: []ENR, delimiter: []const u8) !void {
-    if (std.fs.path.dirname(file_path)) |dir_path| {
-        try std.fs.cwd().makePath(dir_path);
-    }
-
-    const file = try std.fs.cwd().createFile(file_path, .{});
-    defer file.close();
-
-    var txt_buffer: [enrlib.max_enr_size * 2 + enr_prefix.len]u8 = undefined;
-    for (enrs, 0..) |*enr, i| {
-        const out = try enr.encodeToTxt(&txt_buffer);
-        try file.writeAll(out);
-
-        if (i < enrs.len - 1) {
-            try file.writeAll(delimiter);
-        }
-    }
-}
-
-/// Saves multiple SignableENRs to a single file
-pub fn saveMultipleSignableENRsToDisk(file_path: []const u8, signable_enrs: []SignableENR, delimiter: []const u8) !void {
-    if (std.fs.path.dirname(file_path)) |dir_path| {
-        try std.fs.cwd().makePath(dir_path);
-    }
-
-    const file = try std.fs.cwd().createFile(file_path, .{});
-    defer file.close();
-
-    var txt_buffer: [enrlib.max_enr_size * 2 + enr_prefix.len]u8 = undefined;
-    for (signable_enrs, 0..) |*enr, i| {
-        const out = try enr.encodeToTxt(&txt_buffer);
-        try file.writeAll(out);
-
-        if (i < signable_enrs.len - 1) {
-            try file.writeAll(delimiter);
-        }
-    }
-}
-
-/// Helper function to read entire file content into a buffer
-fn readFileContent(file_path: []const u8, buffer: []u8) ![]const u8 {
-    const file = try std.fs.cwd().openFile(file_path, .{});
-    defer file.close();
-
-    const file_size = try file.getEndPos();
-    if (file_size > buffer.len) return ENRFileError.ENRFileTooLarge;
-
-    _ = try file.readAll(buffer[0..file_size]);
-    return buffer[0..file_size];
-}
-
-/// Helper function to read entire file content using allocator
-fn readFileContentAlloc(allocator: std.mem.Allocator, file_path: []const u8) ![]u8 {
-    const file = try std.fs.cwd().openFile(file_path, .{});
-    defer file.close();
-
-    const file_size = try file.getEndPos();
-    const content = try allocator.alloc(u8, file_size);
-    _ = try file.readAll(content);
-    return content;
-}
-
-/// Helper function to write content to file with directory creation
-fn writeFileContent(file_path: []const u8, content: []const u8) !void {
-    if (std.fs.path.dirname(file_path)) |dir_path| {
-        try std.fs.cwd().makePath(dir_path);
-    }
-
-    const file = try std.fs.cwd().createFile(file_path, .{});
-    defer file.close();
-
-    try file.writeAll(content);
 }
 
 const testing = std.testing;
@@ -548,28 +570,6 @@ test "multiple EncodedENRs file operations" {
     }
 }
 
-test "error handling - ENR file too large" {
-    var tmp_dir = testing.tmpDir(.{});
-    defer tmp_dir.cleanup();
-
-    const test_file = "test_large_enr.txt";
-
-    var large_content: [enrlib.max_enr_size + 100]u8 = undefined;
-    @memset(&large_content, 'a');
-
-    try createTestFileWithContent(&tmp_dir, test_file, &large_content);
-
-    var enr: ENR = undefined;
-    const allocator = testing.allocator;
-    const tmp_dir_path = try tmp_dir.dir.realpathAlloc(allocator, ".");
-    defer allocator.free(tmp_dir_path);
-    const full_path = try std.fs.path.join(allocator, &.{ tmp_dir_path, test_file });
-    defer allocator.free(full_path);
-
-    const result = loadENRFromDisk(&enr, full_path);
-    try testing.expectError(ENRFileError.ENRFileTooLarge, result);
-}
-
 test "SignableENR file operations" {
     var tmp_dir = testing.tmpDir(.{});
     defer tmp_dir.cleanup();
@@ -641,4 +641,407 @@ test "multiple SignableENRs file operations" {
         };
         try testing.expectEqualStrings(expected_ip, (try enr.getIpStr(&ip_buffer)).?);
     }
+}
+
+test "writeENR to different writers" {
+    var enr: ENR = undefined;
+    try ENR.decodeTxtInto(&enr, test_enrs[0]);
+
+    var buffer: [1024]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&buffer);
+
+    try writeENR(fbs.writer(), &enr);
+
+    const written_data = fbs.getWritten();
+    try testing.expectEqualStrings(test_enrs[0], written_data);
+
+    const allocator = testing.allocator;
+    var array_buffer = std.ArrayList(u8).init(allocator);
+    defer array_buffer.deinit();
+
+    try writeENR(array_buffer.writer(), &enr);
+    try testing.expectEqualStrings(test_enrs[0], array_buffer.items);
+}
+
+test "writeSignableENR to different writers" {
+    const key_pair = KeyPair.generate();
+    var signable_enr = SignableENR.create(key_pair);
+    defer signable_enr.deinit();
+
+    try signable_enr.set("ip", &[_]u8{ 192, 168, 1, 100 });
+    var udp_bytes: [2]u8 = undefined;
+    std.mem.writeInt(u16, &udp_bytes, 8080, .big);
+    try signable_enr.set("udp", &udp_bytes);
+
+    var buffer: [1024]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&buffer);
+
+    try writeSignableENR(fbs.writer(), &signable_enr);
+
+    const written_data = fbs.getWritten();
+
+    var parsed_enr: ENR = undefined;
+    try ENR.decodeTxtInto(&parsed_enr, written_data);
+
+    try testing.expectEqual(@as(u16, 8080), (try parsed_enr.getUdp()).?);
+    var ip_buffer: [16]u8 = undefined;
+    try testing.expectEqualStrings("192.168.1.100", (try parsed_enr.getIpStr(&ip_buffer)).?);
+
+    const allocator = testing.allocator;
+    var array_buffer = std.ArrayList(u8).init(allocator);
+    defer array_buffer.deinit();
+
+    try writeSignableENR(array_buffer.writer(), &signable_enr);
+
+    try testing.expectEqualStrings(written_data, array_buffer.items);
+}
+
+test "writeMultipleENRs to different writers" {
+    const allocator = testing.allocator;
+    var enr_list = std.ArrayList(ENR).init(allocator);
+    defer enr_list.deinit();
+
+    for (test_enrs[0..3]) |enr_txt| {
+        var enr: ENR = undefined;
+        try ENR.decodeTxtInto(&enr, enr_txt);
+        try enr_list.append(enr);
+    }
+
+    // Test with newline delimiter
+    {
+        var buffer: [4096]u8 = undefined;
+        var fbs = std.io.fixedBufferStream(&buffer);
+
+        try writeMultipleENRs(fbs.writer(), enr_list.items, "\n");
+
+        const written_data = fbs.getWritten();
+        const expected = try std.mem.join(allocator, "\n", test_enrs[0..3]);
+        defer allocator.free(expected);
+
+        try testing.expectEqualStrings(expected, written_data);
+    }
+
+    // Test with custom delimiter
+    {
+        var buffer: [4096]u8 = undefined;
+        var fbs = std.io.fixedBufferStream(&buffer);
+
+        try writeMultipleENRs(fbs.writer(), enr_list.items, " | ");
+
+        const written_data = fbs.getWritten();
+        const expected = try std.mem.join(allocator, " | ", test_enrs[0..3]);
+        defer allocator.free(expected);
+
+        try testing.expectEqualStrings(expected, written_data);
+    }
+
+    // Test writing to ArrayList
+    {
+        var array_buffer = std.ArrayList(u8).init(allocator);
+        defer array_buffer.deinit();
+
+        try writeMultipleENRs(array_buffer.writer(), enr_list.items, ",");
+
+        const expected = try std.mem.join(allocator, ",", test_enrs[0..3]);
+        defer allocator.free(expected);
+
+        try testing.expectEqualStrings(expected, array_buffer.items);
+    }
+}
+
+test "writeMultipleSignableENRs to different writers" {
+    const allocator = testing.allocator;
+    var signable_enr_list = std.ArrayList(SignableENR).init(allocator);
+    defer {
+        for (signable_enr_list.items) |*item| {
+            item.deinit();
+        }
+        signable_enr_list.deinit();
+    }
+
+    for (0..2) |i| {
+        const key_pair = KeyPair.generate();
+        var signable_enr = SignableENR.create(key_pair);
+
+        try signable_enr.set("ip", &[_]u8{ 10, 0, 0, @intCast(i + 1) });
+        var udp_bytes: [2]u8 = undefined;
+        std.mem.writeInt(u16, &udp_bytes, @intCast(5000 + i), .big);
+        try signable_enr.set("udp", &udp_bytes);
+
+        try signable_enr_list.append(signable_enr);
+    }
+
+    var buffer: [4096]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&buffer);
+
+    try writeMultipleSignableENRs(fbs.writer(), signable_enr_list.items, "\n");
+
+    const written_data = fbs.getWritten();
+
+    var lines = std.mem.splitSequence(u8, written_data, "\n");
+    var count: usize = 0;
+    while (lines.next()) |line| {
+        var parsed_enr: ENR = undefined;
+        try ENR.decodeTxtInto(&parsed_enr, line);
+
+        try testing.expectEqual(@as(u16, @intCast(5000 + count)), (try parsed_enr.getUdp()).?);
+        var ip_buffer: [16]u8 = undefined;
+        const expected_ip = if (count == 0) "10.0.0.1" else "10.0.0.2";
+        try testing.expectEqualStrings(expected_ip, (try parsed_enr.getIpStr(&ip_buffer)).?);
+
+        count += 1;
+    }
+    try testing.expectEqual(@as(usize, 2), count);
+
+    var array_buffer = std.ArrayList(u8).init(allocator);
+    defer array_buffer.deinit();
+
+    try writeMultipleSignableENRs(array_buffer.writer(), signable_enr_list.items, " || ");
+
+    try testing.expect(std.mem.indexOf(u8, array_buffer.items, " || ") != null);
+}
+
+test "writer functions with empty inputs" {
+    {
+        var buffer: [1024]u8 = undefined;
+        var fbs = std.io.fixedBufferStream(&buffer);
+
+        const empty_enrs: []ENR = &[_]ENR{};
+        try writeMultipleENRs(fbs.writer(), empty_enrs, "\n");
+
+        const written_data = fbs.getWritten();
+        try testing.expectEqual(@as(usize, 0), written_data.len);
+    }
+
+    {
+        var buffer: [1024]u8 = undefined;
+        var fbs = std.io.fixedBufferStream(&buffer);
+
+        const empty_signable_enrs: []SignableENR = &[_]SignableENR{};
+        try writeMultipleSignableENRs(fbs.writer(), empty_signable_enrs, "\n");
+
+        const written_data = fbs.getWritten();
+        try testing.expectEqual(@as(usize, 0), written_data.len);
+    }
+}
+
+test "writer functions with single item (no delimiter)" {
+    {
+        var enr: ENR = undefined;
+        try ENR.decodeTxtInto(&enr, test_enrs[0]);
+
+        var buffer: [1024]u8 = undefined;
+        var fbs = std.io.fixedBufferStream(&buffer);
+
+        try writeMultipleENRs(fbs.writer(), &[_]ENR{enr}, " DELIMITER ");
+
+        const written_data = fbs.getWritten();
+        try testing.expectEqualStrings(test_enrs[0], written_data);
+        try testing.expect(std.mem.indexOf(u8, written_data, " DELIMITER ") == null);
+    }
+
+    // Test writeMultipleSignableENRs with single SignableENR
+    {
+        const key_pair = KeyPair.generate();
+        var signable_enr = SignableENR.create(key_pair);
+        defer signable_enr.deinit();
+
+        try signable_enr.set("ip", &[_]u8{ 1, 2, 3, 4 });
+        var udp_bytes: [2]u8 = undefined;
+        std.mem.writeInt(u16, &udp_bytes, 1234, .big);
+        try signable_enr.set("udp", &udp_bytes);
+
+        var buffer: [1024]u8 = undefined;
+        var fbs = std.io.fixedBufferStream(&buffer);
+
+        try writeMultipleSignableENRs(fbs.writer(), &[_]SignableENR{signable_enr}, " DELIMITER ");
+
+        const written_data = fbs.getWritten();
+        try testing.expect(std.mem.indexOf(u8, written_data, " DELIMITER ") == null);
+
+        var parsed_enr: ENR = undefined;
+        try ENR.decodeTxtInto(&parsed_enr, written_data);
+        try testing.expectEqual(@as(u16, 1234), (try parsed_enr.getUdp()).?);
+    }
+}
+
+test "readENR from different readers" {
+    var enr: ENR = undefined;
+    try ENR.decodeTxtInto(&enr, test_enrs[0]);
+
+    // Test reading from fixed buffer stream
+    {
+        var fbs = std.io.fixedBufferStream(test_enrs[0]);
+        var read_enr: ENR = undefined;
+        try readENR(fbs.reader(), &read_enr);
+        try expectEqualEnrs(&enr, &read_enr);
+    }
+
+    // Test reading from file via temp file
+    {
+        var tmp_dir = testing.tmpDir(.{});
+        defer tmp_dir.cleanup();
+
+        const test_file = "test_read_enr.txt";
+        try createTestFileWithContent(&tmp_dir, test_file, test_enrs[0]);
+
+        const file = try tmp_dir.dir.openFile(test_file, .{});
+        defer file.close();
+
+        var read_enr: ENR = undefined;
+        try readENR(file.reader(), &read_enr);
+        try expectEqualEnrs(&enr, &read_enr);
+    }
+}
+
+test "readEncodedENR from different readers" {
+    // Test reading from fixed buffer stream
+    {
+        var fbs = std.io.fixedBufferStream(test_enrs[0]);
+        var read_encoded_enr: EncodedENR = undefined;
+        try readEncodedENR(fbs.reader(), &read_encoded_enr);
+
+        try testing.expectEqual(@as(u64, 3), read_encoded_enr.seq());
+        var ip_buffer: [16]u8 = undefined;
+        try testing.expectEqualStrings("4.157.240.54", (try read_encoded_enr.getIpStr(&ip_buffer)).?);
+    }
+
+    // Test reading from ArrayList buffer
+    {
+        const allocator = testing.allocator;
+        var array_buffer = std.ArrayList(u8).init(allocator);
+        defer array_buffer.deinit();
+
+        try array_buffer.appendSlice(test_enrs[0]);
+
+        var fbs = std.io.fixedBufferStream(array_buffer.items);
+        var read_encoded_enr: EncodedENR = undefined;
+        try readEncodedENR(fbs.reader(), &read_encoded_enr);
+
+        try testing.expectEqual(@as(u64, 3), read_encoded_enr.seq());
+    }
+}
+
+test "readMultipleENRs from different readers" {
+    const allocator = testing.allocator;
+
+    const content = try std.mem.join(allocator, "\n", test_enrs[0..3]);
+    defer allocator.free(content);
+
+    // Test reading from fixed buffer stream
+    {
+        var fbs = std.io.fixedBufferStream(content);
+        var enr_list = std.ArrayList(ENR).init(allocator);
+        defer enr_list.deinit();
+
+        try readMultipleENRs(fbs.reader(), &enr_list, "\n");
+
+        try testing.expectEqual(@as(usize, 3), enr_list.items.len);
+
+        try testing.expectEqual(@as(u64, 3), enr_list.items[0].seq);
+        var ip_buffer: [16]u8 = undefined;
+        try testing.expectEqualStrings("4.157.240.54", (try enr_list.items[0].getIpStr(&ip_buffer)).?);
+    }
+
+    // Test reading from temp file
+    {
+        var tmp_dir = testing.tmpDir(.{});
+        defer tmp_dir.cleanup();
+
+        const test_file = "test_read_multiple.txt";
+        try createTestFileWithContent(&tmp_dir, test_file, content);
+
+        const file = try tmp_dir.dir.openFile(test_file, .{});
+        defer file.close();
+
+        var enr_list = std.ArrayList(ENR).init(allocator);
+        defer enr_list.deinit();
+
+        try readMultipleENRs(file.reader(), &enr_list, "\n");
+        try testing.expectEqual(@as(usize, 3), enr_list.items.len);
+    }
+}
+
+test "readMultipleEncodedENRs from different readers" {
+    const allocator = testing.allocator;
+
+    const content = try std.mem.join(allocator, " | ", test_enrs[0..2]);
+    defer allocator.free(content);
+
+    var fbs = std.io.fixedBufferStream(content);
+    var encoded_enr_list = std.ArrayList(EncodedENR).init(allocator);
+    defer encoded_enr_list.deinit();
+
+    try readMultipleEncodedENRs(fbs.reader(), &encoded_enr_list, " | ");
+
+    try testing.expectEqual(@as(usize, 2), encoded_enr_list.items.len);
+
+    try testing.expectEqual(@as(u64, 3), encoded_enr_list.items[0].seq());
+    var ip_buffer: [16]u8 = undefined;
+    try testing.expectEqualStrings("4.157.240.54", (try encoded_enr_list.items[0].getIpStr(&ip_buffer)).?);
+}
+
+test "read functions with whitespace handling" {
+    const allocator = testing.allocator;
+
+    // Test single ENR with surrounding whitespace
+    {
+        const content_with_whitespace = "  \t  " ++ test_enrs[0] ++ "  \n  ";
+        var fbs = std.io.fixedBufferStream(content_with_whitespace);
+
+        var read_enr: ENR = undefined;
+        try readENR(fbs.reader(), &read_enr);
+
+        try testing.expectEqual(@as(u64, 3), read_enr.seq);
+    }
+
+    // Test multiple ENRs with empty lines and whitespace
+    {
+        const content = test_enrs[0] ++ "\n\n  \t  \n" ++ test_enrs[1] ++ "\n   \n";
+        var fbs = std.io.fixedBufferStream(content);
+
+        var enr_list = std.ArrayList(ENR).init(allocator);
+        defer enr_list.deinit();
+
+        try readMultipleENRs(fbs.reader(), &enr_list, "\n");
+        try testing.expectEqual(@as(usize, 2), enr_list.items.len);
+    }
+}
+
+test "read functions error handling" {
+    const allocator = testing.allocator;
+
+    // Test reading invalid ENR format
+    {
+        const invalid_content = "invalid-enr-format";
+        var fbs = std.io.fixedBufferStream(invalid_content);
+
+        var enr: ENR = undefined;
+        const result = readENR(fbs.reader(), &enr);
+        try testing.expectError(error.BadPrefix, result);
+    }
+
+    // Test reading from empty reader
+    {
+        const empty_content = "";
+        var fbs = std.io.fixedBufferStream(empty_content);
+
+        var enr_list = std.ArrayList(ENR).init(allocator);
+        defer enr_list.deinit();
+
+        try readMultipleENRs(fbs.reader(), &enr_list, "\n");
+        try testing.expectEqual(@as(usize, 0), enr_list.items.len);
+    }
+}
+
+test "standard input simulation" {
+    const stdin_content = test_enrs[0];
+    var fbs = std.io.fixedBufferStream(stdin_content);
+
+    var enr: ENR = undefined;
+    try readENR(fbs.reader(), &enr);
+
+    try testing.expectEqual(@as(u64, 3), enr.seq);
+    var ip_buffer: [16]u8 = undefined;
+    try testing.expectEqualStrings("4.157.240.54", (try enr.getIpStr(&ip_buffer)).?);
 }
