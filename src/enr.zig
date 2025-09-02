@@ -3,6 +3,10 @@
 const std = @import("std");
 
 const rlp = @import("rlp.zig");
+const multiaddr = @import("multiformats").multiaddr;
+const Multiaddr = multiaddr.Multiaddr;
+const peer_id = @import("peer-id");
+const PeerId = peer_id.PeerId;
 
 const RLPReader = rlp.RLPReader;
 const RLPWriter = rlp.RLPWriter;
@@ -370,7 +374,7 @@ pub const ENR = struct {
         try decodeInto(enr, buffer[0..size]);
     }
 
-    pub fn getIp(self: *const ENR) !?std.net.Ip4Address {
+    pub fn getIP(self: *const ENR) !?std.net.Ip4Address {
         if (self.get("ip")) |ip_bytes| {
             if (ip_bytes.len != 4) return error.InvalidLength;
             return std.net.Ip4Address.init(ip_bytes[0..4].*, 0);
@@ -378,7 +382,7 @@ pub const ENR = struct {
         return null;
     }
 
-    pub fn getIpStr(self: *const ENR, out: []u8) !?[]const u8 {
+    pub fn getIPStr(self: *const ENR, out: []u8) !?[]const u8 {
         if (self.get("ip")) |ip_bytes| {
             if (ip_bytes.len != 4) return error.InvalidLength;
             const formatted = try std.fmt.bufPrint(out, "{}.{}.{}.{}", .{ ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3] });
@@ -387,10 +391,18 @@ pub const ENR = struct {
         return null;
     }
 
-    pub fn getUdp(self: *const ENR) !?u16 {
+    pub fn getUDP(self: *const ENR) !?u16 {
         if (self.get("udp")) |udp_bytes| {
             if (udp_bytes.len != 2) return error.InvalidLength;
             return std.mem.readInt(u16, udp_bytes[0..2], .big);
+        }
+        return null;
+    }
+
+    pub fn getQUIC(self: *const ENR) !?u16 {
+        if (self.get("quic")) |quic_bytes| {
+            if (quic_bytes.len != 2) return error.InvalidLength;
+            return std.mem.readInt(u16, quic_bytes[0..2], .big);
         }
         return null;
     }
@@ -414,6 +426,48 @@ pub const ENR = struct {
         @memcpy(out[0..2], "0x");
         @memcpy(out[2 .. signature_hex.len + 2], signature_hex[0..signature_hex.len]);
         return out[0 .. signature_hex.len + 2];
+    }
+
+    pub fn peerId(self: *const ENR, allocator: std.mem.Allocator) !PeerId {
+        const pk = self.publicKey();
+        const serialized = switch (pk) {
+            .v4 => |p| p.serialize(),
+        };
+        var peerid_pk = peer_id.PublicKey{
+            .type = .SECP256K1,
+            .data = &serialized,
+        };
+        return PeerId.fromPublicKey(allocator, &peerid_pk);
+    }
+
+    pub fn multiaddrQUIC(self: *const ENR, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(Multiaddr) {
+        var multiaddrs = std.ArrayListUnmanaged(Multiaddr).empty;
+        if (try self.getQUIC()) |quic_port| {
+            if (try self.getIP()) |ip| {
+                var ma = Multiaddr.init(allocator);
+                const ipv4 = multiaddr.Protocol{
+                    .Ip4 = ip,
+                };
+
+                try ma.push(ipv4);
+
+                const udp = multiaddr.Protocol{
+                    .Udp = quic_port,
+                };
+
+                try ma.push(udp);
+
+                const quic = multiaddr.Protocol{
+                    .QuicV1 = {},
+                };
+
+                try ma.push(quic);
+
+                try multiaddrs.append(allocator, ma);
+            }
+        }
+
+        return multiaddrs;
     }
 };
 
@@ -517,7 +571,7 @@ pub const SignableENR = struct {
         return out[0..required_len];
     }
 
-    pub fn getIp(self: *const Self) !?std.net.Ip4Address {
+    pub fn getIP(self: *const Self) !?std.net.Ip4Address {
         if (self.get("ip")) |ip_bytes| {
             if (ip_bytes.len != 4) return error.InvalidLength;
             return std.net.Ip4Address.init(ip_bytes[0..4].*, 0);
@@ -525,7 +579,7 @@ pub const SignableENR = struct {
         return null;
     }
 
-    pub fn getIpStr(self: *const Self, out: []u8) !?[]const u8 {
+    pub fn getIPStr(self: *const Self, out: []u8) !?[]const u8 {
         if (self.get("ip")) |ip_bytes| {
             if (ip_bytes.len != 4) return error.InvalidLength;
             const formatted = try std.fmt.bufPrint(out, "{}.{}.{}.{}", .{ ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3] });
@@ -534,10 +588,18 @@ pub const SignableENR = struct {
         return null;
     }
 
-    pub fn getUdp(self: *const Self) !?u16 {
+    pub fn getUDP(self: *const Self) !?u16 {
         if (self.get("udp")) |udp_bytes| {
             if (udp_bytes.len != 2) return error.InvalidLength;
             return std.mem.readInt(u16, udp_bytes[0..2], .big);
+        }
+        return null;
+    }
+
+    pub fn getQUIC(self: *const Self) !?u16 {
+        if (self.get("quic")) |quic_bytes| {
+            if (quic_bytes.len != 2) return error.InvalidLength;
+            return std.mem.readInt(u16, quic_bytes[0..2], .big);
         }
         return null;
     }
@@ -561,6 +623,48 @@ pub const SignableENR = struct {
         @memcpy(out[0..2], "0x");
         @memcpy(out[2 .. signature_hex.len + 2], signature_hex[0..signature_hex.len]);
         return out[0 .. signature_hex.len + 2];
+    }
+
+    pub fn peerId(self: *const Self, allocator: std.mem.Allocator) !PeerId {
+        const pk = self.publicKey();
+        const serialized = switch (pk) {
+            .v4 => |p| p.serialize(),
+        };
+        var peerid_pk = peer_id.PublicKey{
+            .type = .SECP256K1,
+            .data = &serialized,
+        };
+        return PeerId.fromPublicKey(allocator, &peerid_pk);
+    }
+
+    pub fn multiaddrQUIC(self: *const Self, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(Multiaddr) {
+        var multiaddrs = std.ArrayListUnmanaged(Multiaddr).empty;
+        if (try self.getQUIC()) |quic_port| {
+            if (try self.getIP()) |ip| {
+                var ma = Multiaddr.init(allocator);
+                const ipv4 = multiaddr.Protocol{
+                    .Ip4 = ip,
+                };
+
+                try ma.push(ipv4);
+
+                const udp = multiaddr.Protocol{
+                    .Udp = quic_port,
+                };
+
+                try ma.push(udp);
+
+                const quic = multiaddr.Protocol{
+                    .QuicV1 = {},
+                };
+
+                try ma.push(quic);
+
+                try multiaddrs.append(allocator, ma);
+            }
+        }
+
+        return multiaddrs;
     }
 };
 
@@ -818,7 +922,7 @@ pub const EncodedENR = struct {
         return Self.init(buffer[0..size]);
     }
 
-    pub fn getIp(self: *const Self) !?std.net.Ip4Address {
+    pub fn getIP(self: *const Self) !?std.net.Ip4Address {
         if (self.get("ip")) |ip_bytes| {
             if (ip_bytes.len != 4) return error.InvalidLength;
             return std.net.Ip4Address.init(ip_bytes[0..4].*, 0);
@@ -826,7 +930,7 @@ pub const EncodedENR = struct {
         return null;
     }
 
-    pub fn getIpStr(self: *const Self, out: []u8) !?[]const u8 {
+    pub fn getIPStr(self: *const Self, out: []u8) !?[]const u8 {
         if (self.get("ip")) |ip_bytes| {
             if (ip_bytes.len != 4) return error.InvalidLength;
             const formatted = try std.fmt.bufPrint(out, "{}.{}.{}.{}", .{ ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3] });
@@ -835,8 +939,16 @@ pub const EncodedENR = struct {
         return null;
     }
 
-    pub fn getUdp(self: *const Self) !?u16 {
+    pub fn getUDP(self: *const Self) !?u16 {
         if (self.get("udp")) |udp_bytes| {
+            if (udp_bytes.len != 2) return error.InvalidLength;
+            return std.mem.readInt(u16, udp_bytes[0..2], .big);
+        }
+        return null;
+    }
+
+    pub fn getQUIC(self: *const Self) !?u16 {
+        if (self.get("quic")) |udp_bytes| {
             if (udp_bytes.len != 2) return error.InvalidLength;
             return std.mem.readInt(u16, udp_bytes[0..2], .big);
         }
@@ -862,6 +974,48 @@ pub const EncodedENR = struct {
         @memcpy(out[0..2], "0x");
         @memcpy(out[2 .. signature_hex.len + 2], signature_hex[0..signature_hex.len]);
         return out[0 .. signature_hex.len + 2];
+    }
+
+    pub fn peerId(self: *const Self, allocator: std.mem.Allocator) !PeerId {
+        const pk = self.publicKey();
+        const serialized = switch (pk) {
+            .v4 => |p| p.serialize(),
+        };
+        var peerid_pk = peer_id.PublicKey{
+            .type = .SECP256K1,
+            .data = &serialized,
+        };
+        return PeerId.fromPublicKey(allocator, &peerid_pk);
+    }
+
+    pub fn multiaddrQUIC(self: *const Self, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(Multiaddr) {
+        var multiaddrs = std.ArrayListUnmanaged(Multiaddr).empty;
+        if (try self.getQUIC()) |quic_port| {
+            if (try self.getIP()) |ip| {
+                var ma = Multiaddr.init(allocator);
+                const ipv4 = multiaddr.Protocol{
+                    .Ip4 = ip,
+                };
+
+                try ma.push(ipv4);
+
+                const udp = multiaddr.Protocol{
+                    .Udp = quic_port,
+                };
+
+                try ma.push(udp);
+
+                const quic = multiaddr.Protocol{
+                    .QuicV1 = {},
+                };
+
+                try ma.push(quic);
+
+                try multiaddrs.append(allocator, ma);
+            }
+        }
+
+        return multiaddrs;
     }
 };
 
@@ -893,13 +1047,13 @@ test "ENR test vector" {
     try std.testing.expectEqualSlices(u8, ip, decoded_enr.kvs.get("ip").?);
     try std.testing.expectEqualSlices(u8, udp, decoded_enr.kvs.get("udp").?);
     var ip_out: [16]u8 = undefined;
-    try std.testing.expectEqualStrings("127.0.0.1", (try decoded_enr.getIpStr(&ip_out)).?);
-    try std.testing.expectEqual(30303, (try decoded_enr.getUdp()).?);
+    try std.testing.expectEqualStrings("127.0.0.1", (try decoded_enr.getIPStr(&ip_out)).?);
+    try std.testing.expectEqual(30303, (try decoded_enr.getUDP()).?);
     var public_key_buf: [100]u8 = undefined;
     const public_key_out = try decoded_enr.getPublicKeyStr(&public_key_buf, .lower);
     try std.testing.expectEqualSlices(u8, "0x03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138", public_key_out);
 
-    try std.testing.expectEqual((try std.net.Address.parseIp4("127.0.0.1", 0)).in, (try decoded_enr.getIp()).?);
+    try std.testing.expectEqual((try std.net.Address.parseIp4("127.0.0.1", 0)).in, (try decoded_enr.getIP()).?);
     var sig_buf: [150]u8 = undefined;
     const sig_out = try decoded_enr.getSignatureStr(&sig_buf, .lower);
     try std.testing.expectEqualSlices(u8, "0x7098ad865b00a582051940cb9cf36836572411a47278783077011599ed5cd16b76f2635f4e234738f30813a89eb9137e3e3df5266e3a1f11df72ecf1145ccb9c", sig_out);
@@ -937,12 +1091,12 @@ test "ENR test vector" {
     try std.testing.expectEqual(signable_enr.seq, decoded_enr.seq);
     try std.testing.expectEqualSlices(u8, signable_enr.kvs.get("secp256k1").?, decoded_enr.kvs.get("secp256k1").?);
     var ip_out2: [16]u8 = undefined;
-    try std.testing.expectEqualStrings("127.0.0.1", (try signable_enr.getIpStr(&ip_out2)).?);
-    try std.testing.expectEqual(30303, (try signable_enr.getUdp()).?);
+    try std.testing.expectEqualStrings("127.0.0.1", (try signable_enr.getIPStr(&ip_out2)).?);
+    try std.testing.expectEqual(30303, (try signable_enr.getUDP()).?);
     var public_key_buf2: [100]u8 = undefined;
     const public_key_out2 = try signable_enr.getPublicKeyStr(&public_key_buf2, .lower);
     try std.testing.expectEqualSlices(u8, "0x03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138", public_key_out2);
-    try std.testing.expectEqual((try std.net.Address.parseIp4("127.0.0.1", 0)).in, (try signable_enr.getIp()).?);
+    try std.testing.expectEqual((try std.net.Address.parseIp4("127.0.0.1", 0)).in, (try signable_enr.getIP()).?);
     var sig_buf1: [150]u8 = undefined;
     const sig_out2 = try signable_enr.signStr(&sig_buf1, .lower);
     try std.testing.expectEqualSlices(u8, "0x7098ad865b00a582051940cb9cf36836572411a47278783077011599ed5cd16b76f2635f4e234738f30813a89eb9137e3e3df5266e3a1f11df72ecf1145ccb9c", sig_out2);
@@ -985,13 +1139,80 @@ test "ENR test vector" {
     try std.testing.expectEqualSlices(u8, encoded_enr.get("ip").?, decoded_enr.get("ip").?);
     try std.testing.expectEqualSlices(u8, encoded_enr.get("udp").?, decoded_enr.get("udp").?);
     var ip_out3: [16]u8 = undefined;
-    try std.testing.expectEqualStrings("127.0.0.1", (try encoded_enr.getIpStr(&ip_out3)).?);
-    try std.testing.expectEqual(30303, (try encoded_enr.getUdp()).?);
+    try std.testing.expectEqualStrings("127.0.0.1", (try encoded_enr.getIPStr(&ip_out3)).?);
+    try std.testing.expectEqual(30303, (try encoded_enr.getUDP()).?);
     var public_key_buf3: [100]u8 = undefined;
     const public_key_out3 = try encoded_enr.getPublicKeyStr(&public_key_buf3, .lower);
     try std.testing.expectEqualSlices(u8, "0x03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138", public_key_out3);
-    try std.testing.expectEqual((try std.net.Address.parseIp4("127.0.0.1", 0)).in, (try encoded_enr.getIp()).?);
+    try std.testing.expectEqual((try std.net.Address.parseIp4("127.0.0.1", 0)).in, (try encoded_enr.getIP()).?);
     var sig_buf3: [150]u8 = undefined;
     const sig_out3 = try encoded_enr.getSignatureStr(&sig_buf3, .lower);
     try std.testing.expectEqualSlices(u8, "0x7098ad865b00a582051940cb9cf36836572411a47278783077011599ed5cd16b76f2635f4e234738f30813a89eb9137e3e3df5266e3a1f11df72ecf1145ccb9c", sig_out3);
+
+    var signable_enr3 = SignableENR.create(KeyPair{ .v4 = kp });
+    defer signable_enr3.deinit();
+    signable_enr3.seq = seq;
+    try signable_enr3.set("ip", ip);
+    try signable_enr3.set("quic", udp);
+
+    const s_peer_id3 = try signable_enr3.peerId(std.testing.allocator);
+    var peer_id_buf3: [200]u8 = undefined;
+    const peer_id3_base58 = try s_peer_id3.toBase58(&peer_id_buf3);
+    try std.testing.expectEqualStrings("16Uiu2HAmSH2XVgZqYHWucap5kuPzLnt2TsNQkoppVxB5eJGvaXwm", peer_id3_base58);
+
+    var enr_multiaddrs = try signable_enr3.multiaddrQUIC(std.testing.allocator);
+    defer {
+        for (enr_multiaddrs.items) |*item| {
+            item.deinit();
+        }
+        enr_multiaddrs.deinit(std.testing.allocator);
+    }
+    for (enr_multiaddrs.items) |item| {
+        const ma = try item.toString(std.testing.allocator);
+        try std.testing.expectEqualStrings("/ip4/127.0.0.1/udp/30303/quic-v1", ma);
+        defer std.testing.allocator.free(ma);
+    }
+
+    var enr3_encoded_buf: [max_enr_size]u8 = undefined;
+    const enr3_encoded = try signable_enr3.encodeToTxt(&enr3_encoded_buf);
+    var enr4: ENR = undefined;
+    try ENR.decodeTxtInto(&enr4, enr3_encoded);
+
+    const s_peer_id4 = try enr4.peerId(std.testing.allocator);
+    var peer_id_buf4: [200]u8 = undefined;
+    const peer_id4_base58 = try s_peer_id4.toBase58(&peer_id_buf4);
+    try std.testing.expectEqualStrings("16Uiu2HAmSH2XVgZqYHWucap5kuPzLnt2TsNQkoppVxB5eJGvaXwm", peer_id4_base58);
+
+    var enr4_multiaddrs = try enr4.multiaddrQUIC(std.testing.allocator);
+    defer {
+        for (enr4_multiaddrs.items) |*item| {
+            item.deinit();
+        }
+        enr4_multiaddrs.deinit(std.testing.allocator);
+    }
+    for (enr4_multiaddrs.items) |item| {
+        const ma = try item.toString(std.testing.allocator);
+        try std.testing.expectEqualStrings("/ip4/127.0.0.1/udp/30303/quic-v1", ma);
+        defer std.testing.allocator.free(ma);
+    }
+
+    var enr5 = try EncodedENR.decodeTxtInto(enr3_encoded);
+
+    const s_peer_id5 = try enr5.peerId(std.testing.allocator);
+    var peer_id_buf5: [200]u8 = undefined;
+    const peer_id5_base58 = try s_peer_id5.toBase58(&peer_id_buf5);
+    try std.testing.expectEqualStrings("16Uiu2HAmSH2XVgZqYHWucap5kuPzLnt2TsNQkoppVxB5eJGvaXwm", peer_id5_base58);
+
+    var enr5_multiaddrs = try enr5.multiaddrQUIC(std.testing.allocator);
+    defer {
+        for (enr5_multiaddrs.items) |*item| {
+            item.deinit();
+        }
+        enr5_multiaddrs.deinit(std.testing.allocator);
+    }
+    for (enr5_multiaddrs.items) |item| {
+        const ma = try item.toString(std.testing.allocator);
+        try std.testing.expectEqualStrings("/ip4/127.0.0.1/udp/30303/quic-v1", ma);
+        defer std.testing.allocator.free(ma);
+    }
 }

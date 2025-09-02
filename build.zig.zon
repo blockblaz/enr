@@ -3,7 +3,7 @@
 
     .version = "0.0.0",
 
-    .fingerprint = 0x499ae5d25c594f6a,
+    .fingerprint = 0x499ae5d218a506b4,
 
     .minimum_zig_version = "0.14.1",
 
@@ -11,6 +11,10 @@
         .secp256k1 = .{
             .url = "git+https://github.com/zig-bitcoin/libsecp256k1-zig#b96922b375a601f3303bf43be1dceb3d101df6c6",
             .hash = "secp256k1-0.0.0-AAAAAPPgAAADPOkS7brnO1B26LjbhZsxwz6Kx8a6jCwB",
+        },
+        .peer_id = .{
+            .url = "git+https://github.com/blockblaz/peer-id#b8f98a401e1659cc06243355fc00811a4cbdf2b5",
+            .hash = "peer_id-0.0.0-jlAlYI9cAACWW0w-GZaf3xAuwXNZhOOGKQtm3CvqcdiK",
         },
     },
     .paths = .{

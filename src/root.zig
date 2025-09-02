@@ -365,12 +365,12 @@ test "single ENR file operations" {
 
     try std.testing.expectEqual(3, enr.seq);
     var ip_buffer: [16]u8 = undefined;
-    try std.testing.expectEqualStrings("4.157.240.54", (try enr.getIpStr(&ip_buffer)).?);
+    try std.testing.expectEqualStrings("4.157.240.54", (try enr.getIPStr(&ip_buffer)).?);
     var sig_buffer: [130]u8 = undefined;
     try std.testing.expectEqualStrings("0xc384b303fadb2cc38d2c164b86048ed4d9e4f3baafae423ea6019204d392ba5a79d43cb84528d6e3002ed248bdbdb0fd6584566839cadd5402e2b57edc5453b4", try enr.getSignatureStr(&sig_buffer, .lower));
     var pubkey_buffer: [68]u8 = undefined;
     try std.testing.expectEqualStrings("0x037e897ca0bafa5c9ec5b1d01813b96926128c96ce06fefeaa40e18a2545866ffb", try enr.getPublicKeyStr(&pubkey_buffer, .lower));
-    try std.testing.expectEqual(@as(u16, 9000), (try enr.getUdp()).?);
+    try std.testing.expectEqual(@as(u16, 9000), (try enr.getUDP()).?);
 
     const test_file = "test_single_enr.txt";
 
@@ -511,12 +511,12 @@ test "EncodedENR file operations" {
 
     try testing.expectEqual(@as(u64, 3), enr.seq);
     var ip_buffer: [16]u8 = undefined;
-    try testing.expectEqualStrings("4.157.240.54", (try loaded_encoded_enr.getIpStr(&ip_buffer)).?);
+    try testing.expectEqualStrings("4.157.240.54", (try loaded_encoded_enr.getIPStr(&ip_buffer)).?);
     var sig_buffer: [130]u8 = undefined;
     try std.testing.expectEqualStrings("0xc384b303fadb2cc38d2c164b86048ed4d9e4f3baafae423ea6019204d392ba5a79d43cb84528d6e3002ed248bdbdb0fd6584566839cadd5402e2b57edc5453b4", try loaded_encoded_enr.getSignatureStr(&sig_buffer, .lower));
     var pubkey_buffer: [68]u8 = undefined;
     try std.testing.expectEqualStrings("0x037e897ca0bafa5c9ec5b1d01813b96926128c96ce06fefeaa40e18a2545866ffb", try loaded_encoded_enr.getPublicKeyStr(&pubkey_buffer, .lower));
-    try std.testing.expectEqual(@as(u16, 9000), (try loaded_encoded_enr.getUdp()).?);
+    try std.testing.expectEqual(@as(u16, 9000), (try loaded_encoded_enr.getUDP()).?);
 }
 
 test "multiple EncodedENRs file operations" {
@@ -545,13 +545,13 @@ test "multiple EncodedENRs file operations" {
         var ip_buffer1: [16]u8 = undefined;
         var ip_buffer2: [16]u8 = undefined;
 
-        const ip1 = try enr.getIpStr(&ip_buffer1);
-        const ip2 = try encoded_enr.getIpStr(&ip_buffer2);
+        const ip1 = try enr.getIPStr(&ip_buffer1);
+        const ip2 = try encoded_enr.getIPStr(&ip_buffer2);
 
         try testing.expectEqualStrings(ip1.?, ip2.?);
 
-        const udp1 = try enr.getUdp();
-        const udp2 = try encoded_enr.getUdp();
+        const udp1 = try enr.getUDP();
+        const udp2 = try encoded_enr.getUDP();
         try testing.expectEqual(udp1.?, udp2.?);
 
         var pubkey_buffer1: [68]u8 = undefined;
@@ -590,9 +590,9 @@ test "SignableENR file operations" {
     var loaded_enr: ENR = undefined;
     try readTempEnr(&tmp_dir, test_file, &loaded_enr);
 
-    try testing.expectEqual(@as(u16, 30303), (try loaded_enr.getUdp()).?);
+    try testing.expectEqual(@as(u16, 30303), (try loaded_enr.getUDP()).?);
     var ip_buffer: [16]u8 = undefined;
-    try testing.expectEqualStrings("127.0.0.1", (try loaded_enr.getIpStr(&ip_buffer)).?);
+    try testing.expectEqualStrings("127.0.0.1", (try loaded_enr.getIPStr(&ip_buffer)).?);
 }
 
 test "multiple SignableENRs file operations" {
@@ -630,7 +630,7 @@ test "multiple SignableENRs file operations" {
     try testing.expectEqual(signable_enr_list.items.len, loaded_enr_list.items.len);
 
     for (loaded_enr_list.items, 0..) |*enr, i| {
-        try testing.expectEqual(@as(u16, @intCast(30303 + i)), (try enr.getUdp()).?);
+        try testing.expectEqual(@as(u16, @intCast(30303 + i)), (try enr.getUDP()).?);
 
         var ip_buffer: [16]u8 = undefined;
         const expected_ip = switch (i) {
@@ -639,7 +639,7 @@ test "multiple SignableENRs file operations" {
             2 => "127.0.0.3",
             else => unreachable,
         };
-        try testing.expectEqualStrings(expected_ip, (try enr.getIpStr(&ip_buffer)).?);
+        try testing.expectEqualStrings(expected_ip, (try enr.getIPStr(&ip_buffer)).?);
     }
 }
 
@@ -683,9 +683,9 @@ test "writeSignableENR to different writers" {
     var parsed_enr: ENR = undefined;
     try ENR.decodeTxtInto(&parsed_enr, written_data);
 
-    try testing.expectEqual(@as(u16, 8080), (try parsed_enr.getUdp()).?);
+    try testing.expectEqual(@as(u16, 8080), (try parsed_enr.getUDP()).?);
     var ip_buffer: [16]u8 = undefined;
-    try testing.expectEqualStrings("192.168.1.100", (try parsed_enr.getIpStr(&ip_buffer)).?);
+    try testing.expectEqualStrings("192.168.1.100", (try parsed_enr.getIPStr(&ip_buffer)).?);
 
     const allocator = testing.allocator;
     var array_buffer = std.ArrayList(u8).init(allocator);
@@ -784,10 +784,10 @@ test "writeMultipleSignableENRs to different writers" {
         var parsed_enr: ENR = undefined;
         try ENR.decodeTxtInto(&parsed_enr, line);
 
-        try testing.expectEqual(@as(u16, @intCast(5000 + count)), (try parsed_enr.getUdp()).?);
+        try testing.expectEqual(@as(u16, @intCast(5000 + count)), (try parsed_enr.getUDP()).?);
         var ip_buffer: [16]u8 = undefined;
         const expected_ip = if (count == 0) "10.0.0.1" else "10.0.0.2";
-        try testing.expectEqualStrings(expected_ip, (try parsed_enr.getIpStr(&ip_buffer)).?);
+        try testing.expectEqualStrings(expected_ip, (try parsed_enr.getIPStr(&ip_buffer)).?);
 
         count += 1;
     }
@@ -861,7 +861,7 @@ test "writer functions with single item (no delimiter)" {
 
         var parsed_enr: ENR = undefined;
         try ENR.decodeTxtInto(&parsed_enr, written_data);
-        try testing.expectEqual(@as(u16, 1234), (try parsed_enr.getUdp()).?);
+        try testing.expectEqual(@as(u16, 1234), (try parsed_enr.getUDP()).?);
     }
 }
 
@@ -903,7 +903,7 @@ test "readEncodedENR from different readers" {
 
         try testing.expectEqual(@as(u64, 3), read_encoded_enr.seq());
         var ip_buffer: [16]u8 = undefined;
-        try testing.expectEqualStrings("4.157.240.54", (try read_encoded_enr.getIpStr(&ip_buffer)).?);
+        try testing.expectEqualStrings("4.157.240.54", (try read_encoded_enr.getIPStr(&ip_buffer)).?);
     }
 
     // Test reading from ArrayList buffer
@@ -940,7 +940,7 @@ test "readMultipleENRs from different readers" {
 
         try testing.expectEqual(@as(u64, 3), enr_list.items[0].seq);
         var ip_buffer: [16]u8 = undefined;
-        try testing.expectEqualStrings("4.157.240.54", (try enr_list.items[0].getIpStr(&ip_buffer)).?);
+        try testing.expectEqualStrings("4.157.240.54", (try enr_list.items[0].getIPStr(&ip_buffer)).?);
     }
 
     // Test reading from temp file
@@ -978,7 +978,7 @@ test "readMultipleEncodedENRs from different readers" {
 
     try testing.expectEqual(@as(u64, 3), encoded_enr_list.items[0].seq());
     var ip_buffer: [16]u8 = undefined;
-    try testing.expectEqualStrings("4.157.240.54", (try encoded_enr_list.items[0].getIpStr(&ip_buffer)).?);
+    try testing.expectEqualStrings("4.157.240.54", (try encoded_enr_list.items[0].getIPStr(&ip_buffer)).?);
 }
 
 test "read functions with whitespace handling" {
@@ -1043,5 +1043,5 @@ test "standard input simulation" {
 
     try testing.expectEqual(@as(u64, 3), enr.seq);
     var ip_buffer: [16]u8 = undefined;
-    try testing.expectEqualStrings("4.157.240.54", (try enr.getIpStr(&ip_buffer)).?);
+    try testing.expectEqualStrings("4.157.240.54", (try enr.getIPStr(&ip_buffer)).?);
 }

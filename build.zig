@@ -7,13 +7,23 @@ pub fn build(b: *std.Build) !void {
 
     const secp256k1 = b.dependency("secp256k1", .{});
 
+    const peer_id = b.dependency("peer_id", .{});
+
     const lib_mod = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
 
+    const multiformats_dep = peer_id.builder.dependency("zmultiformats", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const multiformats_module = multiformats_dep.module("multiformats-zig");
+
     lib_mod.addImport("secp256k1", secp256k1.module("secp256k1"));
+    lib_mod.addImport("peer-id", peer_id.module("peer-id"));
+    lib_mod.addImport("multiformats", multiformats_module);
     lib_mod.linkLibrary(secp256k1.artifact("libsecp"));
 
     try b.modules.put(b.dupe("zig-enr"), lib_mod);
