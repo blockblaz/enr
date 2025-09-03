@@ -948,9 +948,9 @@ pub const EncodedENR = struct {
     }
 
     pub fn getQUIC(self: *const Self) !?u16 {
-        if (self.get("quic")) |udp_bytes| {
-            if (udp_bytes.len != 2) return error.InvalidLength;
-            return std.mem.readInt(u16, udp_bytes[0..2], .big);
+        if (self.get("quic")) |quic_bytes| {
+            if (quic_bytes.len != 2) return error.InvalidLength;
+            return std.mem.readInt(u16, quic_bytes[0..2], .big);
         }
         return null;
     }
