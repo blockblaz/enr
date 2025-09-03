@@ -469,6 +469,43 @@ pub const ENR = struct {
 
         return multiaddrs;
     }
+
+    pub fn multiaddrP2PQUIC(self: *const ENR, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(Multiaddr) {
+        var multiaddrs = std.ArrayListUnmanaged(Multiaddr).empty;
+        const peerid = try self.peerId(allocator);
+        if (try self.getQUIC()) |quic_port| {
+            if (try self.getIP()) |ip| {
+                var ma = Multiaddr.init(allocator);
+                const ipv4 = multiaddr.Protocol{
+                    .Ip4 = ip,
+                };
+
+                try ma.push(ipv4);
+
+                const udp = multiaddr.Protocol{
+                    .Udp = quic_port,
+                };
+
+                try ma.push(udp);
+
+                const quic = multiaddr.Protocol{
+                    .QuicV1 = {},
+                };
+
+                try ma.push(quic);
+
+                const p2p = multiaddr.Protocol{
+                    .P2P = peerid,
+                };
+
+                try ma.push(p2p);
+
+                try multiaddrs.append(allocator, ma);
+            }
+        }
+
+        return multiaddrs;
+    }
 };
 
 /// SignableENR - A mutable ENR builder for creating and updating node records.
@@ -659,6 +696,43 @@ pub const SignableENR = struct {
                 };
 
                 try ma.push(quic);
+
+                try multiaddrs.append(allocator, ma);
+            }
+        }
+
+        return multiaddrs;
+    }
+
+    pub fn multiaddrP2PQUIC(self: *const Self, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(Multiaddr) {
+        var multiaddrs = std.ArrayListUnmanaged(Multiaddr).empty;
+        const peerid = try self.peerId(allocator);
+        if (try self.getQUIC()) |quic_port| {
+            if (try self.getIP()) |ip| {
+                var ma = Multiaddr.init(allocator);
+                const ipv4 = multiaddr.Protocol{
+                    .Ip4 = ip,
+                };
+
+                try ma.push(ipv4);
+
+                const udp = multiaddr.Protocol{
+                    .Udp = quic_port,
+                };
+
+                try ma.push(udp);
+
+                const quic = multiaddr.Protocol{
+                    .QuicV1 = {},
+                };
+
+                try ma.push(quic);
+
+                const p2p = multiaddr.Protocol{
+                    .P2P = peerid,
+                };
+
+                try ma.push(p2p);
 
                 try multiaddrs.append(allocator, ma);
             }
@@ -1017,6 +1091,43 @@ pub const EncodedENR = struct {
 
         return multiaddrs;
     }
+
+    pub fn multiaddrP2PQUIC(self: *const Self, allocator: std.mem.Allocator) !std.ArrayListUnmanaged(Multiaddr) {
+        var multiaddrs = std.ArrayListUnmanaged(Multiaddr).empty;
+        const peerid = try self.peerId(allocator);
+        if (try self.getQUIC()) |quic_port| {
+            if (try self.getIP()) |ip| {
+                var ma = Multiaddr.init(allocator);
+                const ipv4 = multiaddr.Protocol{
+                    .Ip4 = ip,
+                };
+
+                try ma.push(ipv4);
+
+                const udp = multiaddr.Protocol{
+                    .Udp = quic_port,
+                };
+
+                try ma.push(udp);
+
+                const quic = multiaddr.Protocol{
+                    .QuicV1 = {},
+                };
+
+                try ma.push(quic);
+
+                const p2p = multiaddr.Protocol{
+                    .P2P = peerid,
+                };
+
+                try ma.push(p2p);
+
+                try multiaddrs.append(allocator, ma);
+            }
+        }
+
+        return multiaddrs;
+    }
 };
 
 test "ENR test vector" {
@@ -1173,6 +1284,19 @@ test "ENR test vector" {
         defer std.testing.allocator.free(ma);
     }
 
+    var enr_p2p_multiaddrs = try signable_enr3.multiaddrP2PQUIC(std.testing.allocator);
+    defer {
+        for (enr_p2p_multiaddrs.items) |*item| {
+            item.deinit();
+        }
+        enr_p2p_multiaddrs.deinit(std.testing.allocator);
+    }
+    for (enr_p2p_multiaddrs.items) |item| {
+        const ma = try item.toString(std.testing.allocator);
+        try std.testing.expectEqualStrings("/ip4/127.0.0.1/udp/30303/quic-v1/p2p/16Uiu2HAmSH2XVgZqYHWucap5kuPzLnt2TsNQkoppVxB5eJGvaXwm", ma);
+        defer std.testing.allocator.free(ma);
+    }
+
     var enr3_encoded_buf: [max_enr_size]u8 = undefined;
     const enr3_encoded = try signable_enr3.encodeToTxt(&enr3_encoded_buf);
     var enr4: ENR = undefined;
@@ -1196,6 +1320,19 @@ test "ENR test vector" {
         defer std.testing.allocator.free(ma);
     }
 
+    var enr4_p2p_multiaddrs = try enr4.multiaddrP2PQUIC(std.testing.allocator);
+    defer {
+        for (enr4_p2p_multiaddrs.items) |*item| {
+            item.deinit();
+        }
+        enr4_p2p_multiaddrs.deinit(std.testing.allocator);
+    }
+    for (enr4_p2p_multiaddrs.items) |item| {
+        const ma = try item.toString(std.testing.allocator);
+        try std.testing.expectEqualStrings("/ip4/127.0.0.1/udp/30303/quic-v1/p2p/16Uiu2HAmSH2XVgZqYHWucap5kuPzLnt2TsNQkoppVxB5eJGvaXwm", ma);
+        defer std.testing.allocator.free(ma);
+    }
+
     var enr5 = try EncodedENR.decodeTxtInto(enr3_encoded);
 
     const s_peer_id5 = try enr5.peerId(std.testing.allocator);
@@ -1213,6 +1350,19 @@ test "ENR test vector" {
     for (enr5_multiaddrs.items) |item| {
         const ma = try item.toString(std.testing.allocator);
         try std.testing.expectEqualStrings("/ip4/127.0.0.1/udp/30303/quic-v1", ma);
+        defer std.testing.allocator.free(ma);
+    }
+
+    var enr5_p2p_multiaddrs = try enr5.multiaddrP2PQUIC(std.testing.allocator);
+    defer {
+        for (enr5_p2p_multiaddrs.items) |*item| {
+            item.deinit();
+        }
+        enr5_p2p_multiaddrs.deinit(std.testing.allocator);
+    }
+    for (enr5_p2p_multiaddrs.items) |item| {
+        const ma = try item.toString(std.testing.allocator);
+        try std.testing.expectEqualStrings("/ip4/127.0.0.1/udp/30303/quic-v1/p2p/16Uiu2HAmSH2XVgZqYHWucap5kuPzLnt2TsNQkoppVxB5eJGvaXwm", ma);
         defer std.testing.allocator.free(ma);
     }
 }

@@ -9,12 +9,12 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    const peer_id_dep = b.dependency("peer_id", .{
+    const multiformats_dep = b.dependency("zmultiformats", .{
         .target = target,
         .optimize = optimize,
     });
 
-    const multiformats_dep = peer_id_dep.builder.dependency("zmultiformats", .{
+    const peer_id_dep = multiformats_dep.builder.dependency("peer_id", .{
         .target = target,
         .optimize = optimize,
     });
