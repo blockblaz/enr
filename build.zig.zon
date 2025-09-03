@@ -3,7 +3,7 @@
 
     .version = "0.0.0",
 
-    .fingerprint = 0x499ae5d25c594f6a,
+    .fingerprint = 0x499ae5d2db8fed70,
 
     .minimum_zig_version = "0.14.1",
 
@@ -11,6 +11,10 @@
         .secp256k1 = .{
             .url = "git+https://github.com/zig-bitcoin/libsecp256k1-zig#b96922b375a601f3303bf43be1dceb3d101df6c6",
             .hash = "secp256k1-0.0.0-AAAAAPPgAAADPOkS7brnO1B26LjbhZsxwz6Kx8a6jCwB",
+        },
+        .zmultiformats = .{
+            .url = "git+https://github.com/zen-eth/multiformats-zig#92c90226ee8b14052718df724a1bc753996a6e07",
+            .hash = "zmultiformats-0.1.0-U2uyh94UBQCwBOXy5xZ9SZQJkQXZSiYCudWPWxNqjuE0",
         },
     },
     .paths = .{
