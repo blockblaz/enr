@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  ZIG_VERSION: 0.14.1
+  ZIG_VERSION: 0.15.2
 
 jobs:
   build:
@@ -20,7 +20,7 @@ jobs:
       - name: Set up Zig
         uses: mlugg/setup-zig@v2.0.5
         with:
-          version: 0.14.1
+          version: 0.15.2
 
       - name: Formatting
         run: zig fmt --check --color on .
