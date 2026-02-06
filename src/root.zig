@@ -31,7 +31,7 @@ pub const deinitGlobalSecp256k1Ctx = secp256k1.deinitSecp256k1Context;
 /// Returns a pointer to the global context for secp256k1 operations.
 pub const getGlobalSecp256k1Ctx = secp256k1.getSecp256k1Context;
 
-const max_enr_txt_size = enrlib.max_enr_txt_size;
+pub const max_enr_txt_size = enrlib.max_enr_txt_size;
 
 /// Loads ENR from the given file path
 pub fn loadENRFromDisk(enr: *ENR, file_path: []const u8) !void {
