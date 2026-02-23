@@ -14,7 +14,12 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    const peer_id_dep = multiformats_dep.builder.dependency("peer_id", .{
+    const multiaddr_dep = b.dependency("multiaddr", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const peer_id_dep = b.dependency("peer_id", .{
         .target = target,
         .optimize = optimize,
     });
@@ -28,6 +33,7 @@ pub fn build(b: *std.Build) !void {
     lib_mod.addImport("secp256k1", secp256k1_dep.module("secp256k1"));
     lib_mod.addImport("peer-id", peer_id_dep.module("peer-id"));
     lib_mod.addImport("multiformats", multiformats_dep.module("multiformats-zig"));
+    lib_mod.addImport("multiaddr", multiaddr_dep.module("multiaddr"));
     lib_mod.linkLibrary(secp256k1_dep.artifact("libsecp"));
 
     const lib = b.addLibrary(.{

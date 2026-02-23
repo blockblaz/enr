@@ -1,9 +1,10 @@
 # enr
+
 Ethereum Node Records (ENR) utility in Zig.
 
 ## Prerequisites
 
-- Zig 0.14.1
+- Zig 0.15.2
 
 ## Building
 

@@ -3,8 +3,9 @@
 const std = @import("std");
 
 const rlp = @import("rlp.zig");
-const multiaddr = @import("multiformats").multiaddr;
-const Multiaddr = multiaddr.Multiaddr;
+const multiaddr_mod = @import("multiaddr");
+const multiaddr = multiaddr_mod.multiaddr;
+const Multiaddr = multiaddr_mod.Multiaddr;
 const peer_id = @import("peer-id");
 const PeerId = peer_id.PeerId;
 
@@ -16,6 +17,8 @@ const secp256k1 = @import("secp256k1.zig");
 
 const digest_size = secp256k1.digest_size;
 pub const max_enr_size = 300;
+pub const enr_txt_prefix_len = 4; // "enr:"
+pub const max_enr_txt_size = enr_txt_prefix_len + std.base64.url_safe_no_pad.Encoder.calcSize(max_enr_size);
 pub const signature_size = 64;
 // non-kv bytes
 // list_len_len, list_len, sig_len_len, sig_len, sig, seq, id_len, id_byte
@@ -46,9 +49,22 @@ pub const KVs = struct {
     }
 
     pub fn put(self: *KVs, key: []const u8, value: []const u8) !void {
-        const owned_key = try self.allocator.dupe(u8, key);
         const owned_value = try self.allocator.dupe(u8, value);
-        try self.map.put(owned_key, owned_value);
+        errdefer self.allocator.free(owned_value);
+
+        const gop = try self.map.getOrPut(key);
+        if (gop.found_existing) {
+            self.allocator.free(gop.value_ptr.*);
+            gop.value_ptr.* = owned_value;
+        } else {
+            const owned_key = self.allocator.dupe(u8, key) catch |err| {
+                // Remove the uninitialized slot that getOrPut created.
+                self.map.removeByPtr(gop.key_ptr);
+                return err;
+            };
+            gop.key_ptr.* = owned_key;
+            gop.value_ptr.* = owned_value;
+        }
     }
 
     pub fn get(self: *const KVs, key: []const u8) ?[]const u8 {
@@ -61,15 +77,16 @@ pub const KVs = struct {
 
     pub const Iterator = struct {
         keys: std.ArrayList([]const u8),
+        allocator: std.mem.Allocator,
         map: *const std.StringHashMap([]const u8),
         index: usize,
 
         pub fn init(kvs: *const KVs) Iterator {
-            var keys = std.ArrayList([]const u8).init(kvs.allocator);
+            var keys: std.ArrayList([]const u8) = .empty;
 
             var map_it = kvs.map.iterator();
             while (map_it.next()) |entry| {
-                keys.append(entry.key_ptr.*) catch unreachable;
+                keys.append(kvs.allocator, entry.key_ptr.*) catch unreachable;
             }
 
             std.sort.heap([]const u8, keys.items, {}, struct {
@@ -81,6 +98,7 @@ pub const KVs = struct {
 
             return Iterator{
                 .keys = keys,
+                .allocator = kvs.allocator,
                 .map = &kvs.map,
                 .index = 0,
             };
@@ -97,7 +115,7 @@ pub const KVs = struct {
         }
 
         pub fn deinit(self: *Iterator) void {
-            self.keys.deinit();
+            self.keys.deinit(self.allocator);
         }
     };
 
@@ -326,6 +344,8 @@ pub const ENR = struct {
         const seq = std.mem.readVarInt(u64, seq_bytes, .big);
 
         var kvs = KVs.init();
+        errdefer kvs.deinit();
+
         while (!list_reader.finished()) {
             const key = list_reader.read(.{ .short_string, .long_string }) catch unreachable;
             const value = list_reader.read(.{ .single_byte, .short_string, .long_string }) catch unreachable;
@@ -362,13 +382,15 @@ pub const ENR = struct {
     }
 
     pub fn decodeTxtInto(enr: *ENR, source: []const u8) !void {
-        if (!std.mem.eql(u8, source[0..4], "enr:")) {
+        if (source.len < 4 or !std.mem.eql(u8, source[0..4], "enr:")) {
             return Error.BadPrefix;
         }
 
-        var buffer: [max_enr_size]u8 = undefined;
         const decoder = std.base64.url_safe_no_pad.Decoder;
         const size = try decoder.calcSizeForSlice(source[4..]);
+        if (size > max_enr_size) return Error.TooLong;
+
+        var buffer: [max_enr_size]u8 = undefined;
         try decoder.decode(buffer[0..size], source[4..]);
 
         try decodeInto(enr, buffer[0..size]);
@@ -810,12 +832,13 @@ fn kvsLen(kvs: *const KVs) usize {
 }
 
 pub fn decodeTxtIntoRlp(dest: []u8, source: []const u8) ![]u8 {
-    if (!std.mem.eql(u8, source[0..4], "enr:")) {
+    if (source.len < 4 or !std.mem.eql(u8, source[0..4], "enr:")) {
         return Error.BadPrefix;
     }
 
     const decoder = std.base64.url_safe_no_pad.Decoder;
     const size = try decoder.calcSizeForSlice(source[4..]);
+    if (size > dest.len) return Error.TooLong;
     try decoder.decode(dest[0..size], source[4..]);
 
     return dest[0..size];
@@ -981,7 +1004,7 @@ pub const EncodedENR = struct {
     }
 
     pub fn decodeTxtInto(source: []const u8) !Self {
-        if (!std.mem.eql(u8, source[0..4], "enr:")) {
+        if (source.len < 4 or !std.mem.eql(u8, source[0..4], "enr:")) {
             return Error.BadPrefix;
         }
 
@@ -1297,7 +1320,7 @@ test "ENR test vector" {
         defer std.testing.allocator.free(ma);
     }
 
-    var enr3_encoded_buf: [max_enr_size]u8 = undefined;
+    var enr3_encoded_buf: [max_enr_txt_size]u8 = undefined;
     const enr3_encoded = try signable_enr3.encodeToTxt(&enr3_encoded_buf);
     var enr4: ENR = undefined;
     try ENR.decodeTxtInto(&enr4, enr3_encoded);
