@@ -5,12 +5,12 @@
 
     .fingerprint = 0x499ae5d2db8fed70,
 
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
 
     .dependencies = .{
         .secp256k1 = .{
-            .url = "git+https://github.com/blockblaz/libsecp256k1-zig#518a1370b66c6b575b4831c4a1a182f5b30b3d75",
-            .hash = "secp256k1-0.0.3-vtxi58DhAABoPpDgG3wagaDXiHHIDezLOPE0BI4V0bDS",
+            .url = "git+https://github.com/blockblaz/libsecp256k1-zig#c4c108996e0598d3267620c32cf6c7e197bd4e53",
+            .hash = "secp256k1-0.0.3-vtxi577hAAD8sNCl5L9rrPhONGE7qSBvgnr6rzH--Ep5",
         },
         .zmultiformats = .{
             .url = "git+https://github.com/zen-eth/multiformats-zig#ddf4f0af34ce8f87c2dc7df73a261738c3868093",
@@ -21,8 +21,8 @@
             .hash = "multiaddr-0.1.0-Cjayds-5AAArNw0ghMgquaRygVf7-kEWQJlQGjVpZzZ0",
         },
         .peer_id = .{
-            .url = "git+https://github.com/blockblaz/peer-id#41f336b92315dcbc852345a2468487c697cfdcbe",
-            .hash = "peer_id-0.0.0-vHIk8ZdfAADctTzIgznksWwEzygVynEeSKDim42Pz-QL",
+            .url = "git+https://github.com/blockblaz/peer-id#a6fbdb8241c38ac57e420fa95c32f364a954cced",
+            .hash = "peer_id-0.0.0-vHIk8YxeAAD4KyWTd0fQo_ml_REyx8MQy72OD5OOIqn-",
         },
     },
     .paths = .{
