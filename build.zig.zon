@@ -21,8 +21,8 @@
             .hash = "multiaddr-0.1.0-Cjayds-5AAArNw0ghMgquaRygVf7-kEWQJlQGjVpZzZ0",
         },
         .peer_id = .{
-            .url = "git+https://github.com/blockblaz/peer-id#41f336b92315dcbc852345a2468487c697cfdcbe",
-            .hash = "peer_id-0.0.0-vHIk8ZdfAADctTzIgznksWwEzygVynEeSKDim42Pz-QL",
+            .url = "git+https://github.com/blockblaz/peer-id#a6fbdb8241c38ac57e420fa95c32f364a954cced",
+            .hash = "peer_id-0.0.0-vHIk8YxeAAD4KyWTd0fQo_ml_REyx8MQy72OD5OOIqn-",
         },
     },
     .paths = .{
