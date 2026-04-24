@@ -9,8 +9,8 @@
 
     .dependencies = .{
         .secp256k1 = .{
-            .url = "git+https://github.com/blockblaz/libsecp256k1-zig#518a1370b66c6b575b4831c4a1a182f5b30b3d75",
-            .hash = "secp256k1-0.0.3-vtxi58DhAABoPpDgG3wagaDXiHHIDezLOPE0BI4V0bDS",
+            .url = "git+https://github.com/blockblaz/libsecp256k1-zig#c4c108996e0598d3267620c32cf6c7e197bd4e53",
+            .hash = "secp256k1-0.0.3-vtxi577hAAD8sNCl5L9rrPhONGE7qSBvgnr6rzH--Ep5",
         },
         .zmultiformats = .{
             .url = "git+https://github.com/zen-eth/multiformats-zig#ddf4f0af34ce8f87c2dc7df73a261738c3868093",
