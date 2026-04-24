@@ -10,25 +10,37 @@ pub const digest_size = 32;
 
 /// Global context for secp256k1 operations
 var global_secp_ctx: ?Secp256k1 = null;
-var secp_once = std.once(initSecp256k1Context);
-
-/// Initializes the global context for secp256k1 operations.
-fn initSecp256k1Context() void {
-    global_secp_ctx = Secp256k1.genNew();
-}
+/// State: 0 = uninitialized, 1 = initializing, 2 = initialized.
+var secp_ctx_state: std.atomic.Value(u8) = .init(0);
 
 /// Deinitializes the global context for secp256k1 operations.
 pub fn deinitSecp256k1Context() void {
+    while (secp_ctx_state.cmpxchgStrong(2, 1, .acquire, .monotonic) != null) {
+        if (secp_ctx_state.load(.monotonic) == 0) return;
+        std.Thread.yield() catch {};
+    }
     if (global_secp_ctx) |*ctx| {
         ctx.deinit();
         global_secp_ctx = null;
     }
+    secp_ctx_state.store(0, .release);
 }
 
 /// Returns a pointer to the global context for secp256k1 operations.
 pub fn getSecp256k1Context() *Secp256k1 {
-    secp_once.call();
-    return &global_secp_ctx.?;
+    while (true) {
+        switch (secp_ctx_state.load(.acquire)) {
+            2 => return &global_secp_ctx.?,
+            0 => {
+                if (secp_ctx_state.cmpxchgStrong(0, 1, .acquire, .monotonic) == null) {
+                    global_secp_ctx = Secp256k1.genNew();
+                    secp_ctx_state.store(2, .release);
+                    return &global_secp_ctx.?;
+                }
+            },
+            else => std.Thread.yield() catch {},
+        }
+    }
 }
 
 /// A streaming verifier for secp256k1 signatures

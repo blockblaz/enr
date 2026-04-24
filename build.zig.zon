@@ -5,24 +5,24 @@
 
     .fingerprint = 0x499ae5d2db8fed70,
 
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
 
     .dependencies = .{
         .secp256k1 = .{
-            .url = "git+https://github.com/blockblaz/libsecp256k1-zig#518a1370b66c6b575b4831c4a1a182f5b30b3d75",
-            .hash = "secp256k1-0.0.3-vtxi58DhAABoPpDgG3wagaDXiHHIDezLOPE0BI4V0bDS",
+            .url = "git+https://github.com/blockblaz/libsecp256k1-zig#1f932989162757b4de8a709e4dbc419a4d52633b",
+            .hash = "secp256k1-0.0.3-vtxi54zlAAAxA-6t34LIbPW1BC4pCkqWNlOiievuFM4P",
         },
         .zmultiformats = .{
-            .url = "git+https://github.com/zen-eth/multiformats-zig#ddf4f0af34ce8f87c2dc7df73a261738c3868093",
-            .hash = "zmultiformats-0.1.0-yjvchohoBADALnCylBLeQF7Vn0SKULmQ_sFOrhzgmvQO",
+            .url = "git+https://github.com/zen-eth/multiformats-zig#3c242a8ab995d837e5f0efcbee91ee8174403eaa",
+            .hash = "zmultiformats-0.1.0-yjvchhppBABoxROWEWl0SVlAujCeYzQW-ALWHdAkHJNi",
         },
         .multiaddr = .{
-            .url = "git+https://github.com/zen-eth/multiaddr-zig#c5e16a3a506cca8d37b732ea343818033782e874",
-            .hash = "multiaddr-0.1.0-Cjayds-5AAArNw0ghMgquaRygVf7-kEWQJlQGjVpZzZ0",
+            .url = "git+https://github.com/zen-eth/multiaddr-zig#f38d4e2a47a4f7cc0ccdbd846731cddf7d16f905",
+            .hash = "multiaddr-0.1.0-Cjaydr-zAACLaCgWQeH78jvZ7K0R696jUQ5bqF7--VRm",
         },
         .peer_id = .{
-            .url = "git+https://github.com/blockblaz/peer-id#41f336b92315dcbc852345a2468487c697cfdcbe",
-            .hash = "peer_id-0.0.0-vHIk8ZdfAADctTzIgznksWwEzygVynEeSKDim42Pz-QL",
+            .url = "git+https://github.com/blockblaz/peer-id#05ac4b1b00bd90ec3fcf7add23f532b764e36157",
+            .hash = "peer_id-0.0.0-vHIk8WBgAAAeyBjMHGB3soNSxhZoh_J7yOtXRktVN-nP",
         },
     },
     .paths = .{

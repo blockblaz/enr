@@ -396,10 +396,10 @@ pub const ENR = struct {
         try decodeInto(enr, buffer[0..size]);
     }
 
-    pub fn getIP(self: *const ENR) !?std.net.Ip4Address {
+    pub fn getIP(self: *const ENR) !?std.Io.net.Ip4Address {
         if (self.get("ip")) |ip_bytes| {
             if (ip_bytes.len != 4) return error.InvalidLength;
-            return std.net.Ip4Address.init(ip_bytes[0..4].*, 0);
+            return std.Io.net.Ip4Address{ .bytes = ip_bytes[0..4].*, .port = 0 };
         }
         return null;
     }
@@ -630,10 +630,10 @@ pub const SignableENR = struct {
         return out[0..required_len];
     }
 
-    pub fn getIP(self: *const Self) !?std.net.Ip4Address {
+    pub fn getIP(self: *const Self) !?std.Io.net.Ip4Address {
         if (self.get("ip")) |ip_bytes| {
             if (ip_bytes.len != 4) return error.InvalidLength;
-            return std.net.Ip4Address.init(ip_bytes[0..4].*, 0);
+            return std.Io.net.Ip4Address{ .bytes = ip_bytes[0..4].*, .port = 0 };
         }
         return null;
     }
@@ -1019,10 +1019,10 @@ pub const EncodedENR = struct {
         return Self.init(buffer[0..size]);
     }
 
-    pub fn getIP(self: *const Self) !?std.net.Ip4Address {
+    pub fn getIP(self: *const Self) !?std.Io.net.Ip4Address {
         if (self.get("ip")) |ip_bytes| {
             if (ip_bytes.len != 4) return error.InvalidLength;
-            return std.net.Ip4Address.init(ip_bytes[0..4].*, 0);
+            return std.Io.net.Ip4Address{ .bytes = ip_bytes[0..4].*, .port = 0 };
         }
         return null;
     }
@@ -1187,7 +1187,7 @@ test "ENR test vector" {
     const public_key_out = try decoded_enr.getPublicKeyStr(&public_key_buf, .lower);
     try std.testing.expectEqualSlices(u8, "0x03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138", public_key_out);
 
-    try std.testing.expectEqual((try std.net.Address.parseIp4("127.0.0.1", 0)).in, (try decoded_enr.getIP()).?);
+    try std.testing.expectEqual(try std.Io.net.Ip4Address.parse("127.0.0.1", 0), (try decoded_enr.getIP()).?);
     var sig_buf: [150]u8 = undefined;
     const sig_out = try decoded_enr.getSignatureStr(&sig_buf, .lower);
     try std.testing.expectEqualSlices(u8, "0x7098ad865b00a582051940cb9cf36836572411a47278783077011599ed5cd16b76f2635f4e234738f30813a89eb9137e3e3df5266e3a1f11df72ecf1145ccb9c", sig_out);
@@ -1230,7 +1230,7 @@ test "ENR test vector" {
     var public_key_buf2: [100]u8 = undefined;
     const public_key_out2 = try signable_enr.getPublicKeyStr(&public_key_buf2, .lower);
     try std.testing.expectEqualSlices(u8, "0x03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138", public_key_out2);
-    try std.testing.expectEqual((try std.net.Address.parseIp4("127.0.0.1", 0)).in, (try signable_enr.getIP()).?);
+    try std.testing.expectEqual(try std.Io.net.Ip4Address.parse("127.0.0.1", 0), (try signable_enr.getIP()).?);
     var sig_buf1: [150]u8 = undefined;
     const sig_out2 = try signable_enr.signStr(&sig_buf1, .lower);
     try std.testing.expectEqualSlices(u8, "0x7098ad865b00a582051940cb9cf36836572411a47278783077011599ed5cd16b76f2635f4e234738f30813a89eb9137e3e3df5266e3a1f11df72ecf1145ccb9c", sig_out2);
@@ -1278,7 +1278,7 @@ test "ENR test vector" {
     var public_key_buf3: [100]u8 = undefined;
     const public_key_out3 = try encoded_enr.getPublicKeyStr(&public_key_buf3, .lower);
     try std.testing.expectEqualSlices(u8, "0x03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138", public_key_out3);
-    try std.testing.expectEqual((try std.net.Address.parseIp4("127.0.0.1", 0)).in, (try encoded_enr.getIP()).?);
+    try std.testing.expectEqual(try std.Io.net.Ip4Address.parse("127.0.0.1", 0), (try encoded_enr.getIP()).?);
     var sig_buf3: [150]u8 = undefined;
     const sig_out3 = try encoded_enr.getSignatureStr(&sig_buf3, .lower);
     try std.testing.expectEqualSlices(u8, "0x7098ad865b00a582051940cb9cf36836572411a47278783077011599ed5cd16b76f2635f4e234738f30813a89eb9137e3e3df5266e3a1f11df72ecf1145ccb9c", sig_out3);
