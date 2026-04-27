@@ -17,12 +17,12 @@
             .hash = "zmultiformats-0.1.0-yjvchhppBABoxROWEWl0SVlAujCeYzQW-ALWHdAkHJNi",
         },
         .multiaddr = .{
-            .url = "git+https://github.com/zen-eth/multiaddr-zig#f38d4e2a47a4f7cc0ccdbd846731cddf7d16f905",
-            .hash = "multiaddr-0.1.0-Cjaydr-zAACLaCgWQeH78jvZ7K0R696jUQ5bqF7--VRm",
+            .url = "git+https://github.com/zen-eth/multiaddr-zig#568b5dd7c125973994222a34bc05679ab2f7b545",
+            .hash = "multiaddr-0.1.0-Cjaydr-zAAARdtYgb09TsxD3JXF-Y1x6OM2Ow40o-G80",
         },
         .peer_id = .{
-            .url = "git+https://github.com/blockblaz/peer-id#05ac4b1b00bd90ec3fcf7add23f532b764e36157",
-            .hash = "peer_id-0.0.0-vHIk8WBgAAAeyBjMHGB3soNSxhZoh_J7yOtXRktVN-nP",
+            .url = "git+https://github.com/blockblaz/peer-id#889c0d2d1f3a6aeeb02dc8882640d15638de15ab",
+            .hash = "peer_id-0.0.0-vHIk8V9gAADOHHLTSiieUPV0WBjGKAkrkH1sG-Vfukyo",
         },
     },
     .paths = .{
